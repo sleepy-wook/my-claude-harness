@@ -1,0 +1,12 @@
+# 이 repo에는 비밀이 없다(설계상). 캐시·잡파일만 무시한다.
+
+# Python
+__pycache__/
+*.py[cod]
+.ruff_cache/
+
+# OS / editor junk
+Thumbs.db
+.DS_Store
+.vscode/
+.idea/
