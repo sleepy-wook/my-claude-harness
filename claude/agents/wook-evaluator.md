@@ -1,5 +1,5 @@
 ---
-name: evaluator
+name: wook-evaluator
 description: Independent code Evaluator. Runs the project's tests, lint, and build in an isolated context and returns a verdict bound to REAL exit codes — never to vibes. Use to verify a change actually works before calling it done.
 tools: Bash, Read, Grep, Glob
 ---

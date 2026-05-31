@@ -40,11 +40,13 @@
 | 2026-05-31 | core-rules 시드 3개 확정(과잉행동·테스트·추측) | 형욱 확인("정확해") |
 | 2026-05-31 | git = **별도 깨끗한 repo + 배포** (`~/.claude` 직접 git ✗) | repo에 비밀 0 → 구조적 안전, §7 공개 대비, docs+코드 한 곳 |
 | 2026-05-31 | 작업 도메인 = **4개 전부**(일반코드·백엔드·프론트·DB) | Evaluator는 N개 ✗ → 하나 + 도메인별 레시피(§0-3) |
-| 2026-05-31 | 첫 Evaluator = **온디맨드 `/evaluate`**(일반코드 레시피부터) | Anthropic "Evaluator 하나부터", 위험 낮음, 신뢰 쌓이면 하드게이트 승격 |
+| 2026-05-31 | 첫 Evaluator = **온디맨드 `/wook-evaluate`**(일반코드 레시피부터) | Anthropic "Evaluator 하나부터", 위험 낮음, 신뢰 쌓이면 하드게이트 승격 |
 | 2026-05-31 | 자동화 = **Stop hook 게이트**(opt-in 마커, 테스트만, 재시도 3회) | 형욱 진짜 목표="알아서 호출". command형(싸고 결정론)·마커로 침습성 제어 |
 | 2026-06-01 | 게이트 고도화: **정체(시그니처) 감지 + 게이트 설정화 + `-B`** | 단순 N회 대신 진행/정체 구분(§0-4), 마커로 tests/lint/build 선택 |
 | 2026-06-01 | 검증 **레시피 구동**(`.claude/evaluate.recipe`, 폴백 자동탐지) | stack 하드코딩 ✗ → 프로젝트가 `name: 명령` 선언, 갈아끼움(§0-3). #6을 N개 레시피 대신 한 메커니즘으로 |
-| 2026-06-01 | #8 Planner = **skill `/plan`**(수용 기준→레시피로 박음) | PGE 통합(generic 플래닝과 차별). 서브에이전트화는 나중 |
+| 2026-06-01 | #8 Planner = **skill `/wook-plan`**(수용 기준→레시피로 박음) | PGE 통합(generic 플래닝과 차별). 서브에이전트화는 나중 |
+| 2026-06-01 | 커스텀 스킬/에이전트 **`wook-` 접두사**(`/wook-plan`·`/wook-evaluate`·`wook-evaluator`) | 네이티브 plan 모드·플러그인과 충돌/혼동 제거(형욱 닉네임 네임스페이스) |
+| 2026-06-01 | 게이트 **default-ON by 레시피**(opt-in 마커 폐지, off=`.claude/evaluate-off`) | "켜는 걸 깜빡" 제거 — 레시피 존재=ON, `/wook-plan`이 레시피 보장 |
 
 ---
 
@@ -96,12 +98,12 @@
 
 설계 §0-2/§8-B대로 **Evaluator 하나(컴퓨트 검증)부터.** "테스트 안 돌리고 됐다 함"을 정조준.
 
-### 🟡 #5 Evaluator v1 — 온디맨드 `/evaluate` (배포됨, 서브에이전트는 재시작 후 활성)
-- **형태:** `/evaluate`(skill, 진입점) → **독립 컨텍스트의 `evaluator` 서브에이전트** 디스패치.
+### 🟡 #5 Evaluator v1 — 온디맨드 `/wook-evaluate` (배포됨, 서브에이전트는 재시작 후 활성)
+- **형태:** `/wook-evaluate`(skill, 진입점) → **독립 컨텍스트의 `wook-evaluator` 서브에이전트** 디스패치.
   코드 쓴 컨텍스트가 자기 코드를 칭찬 못 하도록 **평가자 분리**(§0-2).
 - **파일:**
-  - `~/.claude/agents/evaluator.md` — 도구 Bash·Read·Grep·Glob(**Edit/Write 없음** = 판정만, 안 고침)
-  - `~/.claude/skills/evaluate/SKILL.md` — `/evaluate` 진입점, 서브에이전트 디스패치 + 판정 정직 전달
+  - `~/.claude/agents/wook-evaluator.md` — 도구 Bash·Read·Grep·Glob(**Edit/Write 없음** = 판정만, 안 고침)
+  - `~/.claude/skills/wook-evaluate/SKILL.md` — `/wook-evaluate` 진입점, 서브에이전트 디스패치 + 판정 정직 전달
 - **레시피 구동:** 먼저 `.claude/evaluate.recipe`(프로젝트가 선언한 `name: 명령`)를 읽어 실행,
   없으면 자동탐지(python/node) 폴백. **판정은 실제 exit code에 묶음.** stack 하드코딩 안 함.
 - **Iron law:** 실제 명령 실행 + exit 0을 본 것만 PASS. 테스트 못 찾으면 INCONCLUSIVE(거짓 PASS 금지).
@@ -111,40 +113,40 @@
 - **다음:** 백엔드/프론트/DB 레시피 추가(#6).
 
 ### ✅ #7 자동 게이트 — Stop hook (generate → 자동 evaluate 루프)
-- **목적:** 형욱이 원한 핵심 — **수동 `/evaluate` 아니라 harness가 알아서**. 턴이 끝날 때
+- **목적:** 형욱이 원한 핵심 — **수동 `/wook-evaluate` 아니라 harness가 알아서**. 턴이 끝날 때
   자동으로 테스트를 돌려 미통과면 "완료"를 막고 자동으로 계속 작업. (§0-4 반복 루프)
 - **파일:** `~/.claude/hooks/evaluate_gate.py` (`type:"command"` Stop hook, exec form, timeout 300)
 - **왜 command(스크립트)인가:** 매 턴 발동하니 **싸고 결정론적**이어야. LLM 안 씀. 판정은 실제
-  exit code, 실패 시 테스트 출력 그대로 피드백. (깊은 분석은 `/evaluate`의 LLM evaluator)
-- **발동 조건(opt-in, 3중 게이트):** ① cwd/상위에 **`.claude/evaluate-on-stop` 마커** 존재
-  ② **코드 변경**(git status) ③ **테스트 존재**. 아니면 즉시 통과(거의 공짜) → 일반 대화·계획·
-  마커 없는 repo엔 영향 0.
+  exit code, 실패 시 테스트 출력 그대로 피드백. (깊은 분석은 `/wook-evaluate`의 LLM evaluator)
+- **발동 조건(default-ON by 레시피):** ① **`.claude/evaluate.recipe` 존재**(있으면 게이트 ON,
+  켜는 별도 단계 없음) ② **코드 변경**(git status) ③ `.claude/evaluate-off` 없음. 아니면 즉시 통과
+  (거의 공짜) → 일반 대화·계획·레시피 없는 repo엔 영향 0. **"켜는 걸 깜빡" 시나리오 제거.**
 - **검증 레시피(유동적):** `.claude/evaluate.recipe`에 `name: 셸명령` 선언(어떤 stack/도메인이든) →
-  게이트가 그걸 실행. 없으면 자동탐지(python/node) 폴백. 마커에 체크 이름 적으면 stop에서 그
-  부분집합만 블로킹(비우면 전체). 템플릿: `~/.claude/harness/evaluate.recipe.example`
+  게이트가 전부 실행, 미통과면 블로킹. 게이트는 레시피만 봄(무관 repo 안 건드림); 자동탐지 폴백은
+  `/wook-evaluate`(온디맨드) 쪽. 템플릿: `~/.claude/harness/evaluate.recipe.example`
 - **런어웨이·정체 가드(§0-4, 고도화):**
   - 실패마다 **정규화 시그니처**(숫자·타이밍 제거) 계산.
   - **같은 시그니처 3회 연속(stuck)** → 정체로 판단, 자동 루프 포기(systemMessage).
   - 시그니처 **바뀌면**(진행 중) stuck 리셋 → 더 인내하되 **총 5회(MAX) 상한**.
   - 새 stop(`stop_hook_active` false)이면 에피소드 리셋. Claude Code 내장 8-cap이 2차망.
 - **견고성:** 테스트 러너는 `python -B`(stale `.pyc` 무시) → 방금 편집한 코드를 항상 소스에서 재읽음.
-- **검증(시뮬레이션 Stop 이벤트):** 마커없음/통과→allow, 실패→block(실제 출력), 같은실패 1→2→3회=
-  stall give-up, 실패 바뀌면 "new"로 stuck 리셋(진행 감지), `gates: tests,lint`+미사용 import→lint로
-  block, `-B`로 즉시-교체도 정확. 전부 PASS. ✅ live
-- **켜는 법:** 자동 게이트 원하는 repo에서 `touch .claude/evaluate-on-stop` (또는 "이 repo에
-  게이트 켜줘"). 끄기 = 파일 삭제. **이 harness repo는 테스트가 없어 마커 둬도 발동 안 함.**
+- **검증(시뮬레이션 Stop 이벤트):** 레시피 실패→block(실제 출력), 통과→allow, `evaluate-off`→allow(비활성),
+  무레시피→allow, 같은실패 1→2→3회=stall give-up, 실패 바뀌면 진행 감지, 임의 셸 체크(api/db) 동작,
+  `-B`로 즉시-교체도 정확. 전부 PASS. ✅ live
+- **켜는 법:** `.claude/evaluate.recipe` 만들면 끝(보통 `/wook-plan`이 써줌). 끄기 = `.claude/evaluate-off`
+  빈 파일. **이 harness repo는 레시피가 없어 게이트 발동 안 함.**
 
-### ✅ #8 Planner — `/plan` (PGE 삼각형 닫음)
+### ✅ #8 Planner — `/wook-plan` (PGE 삼각형 닫음)
 - **목적:** 코드 전에 **"올바른 동작이 뭔지"를 실행 가능한 수용 기준으로 정의** → 그걸
   `.claude/evaluate.recipe`로 써서 Evaluator/게이트가 *정확히 그 기준*을 검증(§0-2).
 - **차별점:** generic 플래닝(예: superpowers `writing-plans`)과 달리 **PGE 통합** —
   수용 기준 = 머신 체크 가능 형태 → 레시피로 박음. Plan이 기준 정의·기록까지.
-- **파일:** `~/.claude/skills/plan/SKILL.md` (`/plan` 진입점)
+- **파일:** `~/.claude/skills/wook-plan/SKILL.md` (`/wook-plan` 진입점)
 - **흐름:** 모호하면 질문 → SPEC(범위/엣지/수용기준) 제시 → 기준을 `.claude/evaluate.recipe`로
-  번역·제안 → 승인 → 레시피 + `.claude/plan.md` 기록 + (선택)게이트 켜기 → 구현은 그 기준 통과까지.
+  번역·제안 → 승인 → 레시피 + `.claude/plan.md` 기록 → **레시피 작성=게이트 자동 ON** → 구현은 통과까지.
 - **PGE 완성:** Plan(기준 정의·레시피 작성) → Generate(구현) → Evaluate/게이트(그 레시피로 검증).
 - **검증:** 배포·frontmatter 유효 확인. (스킬=프롬프트라 exit code 테스트 불가; 동작은 호출 시 발현)
-- **활성화:** 다음 재시작부터 `/plan` 호출 가능(스킬 목록 갱신 시 등록).
+- **활성화:** 다음 재시작부터 `/wook-plan` 호출 가능(스킬 목록 갱신 시 등록).
 
 ---
 
@@ -163,10 +165,10 @@
 │  ├─ core-rules.README.md            # 규칙 작성 가이드
 │  └─ evaluate.recipe.example         # 검증 레시피 템플릿(프로젝트로 복사)
 ├─ agents/
-│  └─ evaluator.md                    # #5 독립 Evaluator 서브에이전트
+│  └─ wook-evaluator.md               # #5 독립 Evaluator 서브에이전트
 └─ skills/
-   ├─ evaluate/SKILL.md               # /evaluate 진입점
-   └─ plan/SKILL.md                   # #8 /plan (Planner)
+   ├─ evaluate/SKILL.md               # /wook-evaluate 진입점
+   └─ plan/SKILL.md                   # #8 /wook-plan (Planner)
 ```
 
 ---
@@ -184,8 +186,8 @@ my-claude-harness/                  # git repo (비밀 0, 단순 blacklist .giti
 ├─ claude/                          # ~/.claude 산출물의 source of truth
 │  ├─ hooks/{guard_paths, format_py, inject_core_rules, evaluate_gate}.py
 │  ├─ harness/{core-rules.md, core-rules.README.md}
-│  ├─ agents/evaluator.md            # #5 Evaluator 서브에이전트
-│  ├─ skills/{evaluate, plan}/SKILL.md  # /evaluate, /plan 진입점
+│  ├─ agents/wook-evaluator.md       # #5 Evaluator 서브에이전트
+│  ├─ skills/{evaluate, plan}/SKILL.md  # /wook-evaluate, /wook-plan 진입점
 │  └─ settings.hooks.json           # 우리가 소유한 hooks 블록({HOOKS_DIR} placeholder)
 ├─ deploy.py                        # claude/ -> ~/.claude 복사 + settings.json hooks 병합
 └─ .gitignore
@@ -217,12 +219,12 @@ my-claude-harness/                  # git repo (비밀 0, 단순 blacklist .giti
 > **step A(결정론 바닥) 사실상 완료.** 다음은 B(판단 루프/PGE) — 형욱과 의논하며.
 
 **B. 판단 루프 (PGE) — 진행 중, 형욱과 의논하며**
-- [x] #5 Evaluator v1 (온디맨드 `/evaluate`, 일반코드 레시피) — 레시피 검증됨, 재시작 후 서브에이전트 활성
+- [x] #5 Evaluator v1 (온디맨드 `/wook-evaluate`, 일반코드 레시피) — 레시피 검증됨, 재시작 후 서브에이전트 활성
 - [x] #7 자동 게이트(Stop hook, opt-in 마커, 테스트만, 재시도 3회) — 시뮬레이션 4종 검증, live
 - [x] #6 도메인 레시피 = **유동적 레시피 구동**(`.claude/evaluate.recipe`, 하드코딩 ✗) — 어떤 stack/도메인이든 선언으로 갈아끼움. 실제 프로젝트에서 레시피 채우며 검증 예정
 - [x] #7-확장 정체 감지(시그니처 stuck/progress) + 게이트 설정화(tests/lint/build) + `-B` 견고성
-- [x] #8 Planner `/plan` — 수용 기준→`.claude/evaluate.recipe`로 박아 PGE 삼각형 닫음
+- [x] #8 Planner `/wook-plan` — 수용 기준→`.claude/evaluate.recipe`로 박아 PGE 삼각형 닫음
 
-> **PGE 루프 1차 완성**: Plan(`/plan`, 기준 정의·레시피 작성) → Generate(구현) →
-> Evaluate(`/evaluate` + Stop 게이트, 레시피로 검증). 전부 유동적 레시피로 연결됨.
+> **PGE 루프 1차 완성**: Plan(`/wook-plan`, 기준 정의·레시피 작성) → Generate(구현) →
+> Evaluate(`/wook-evaluate` + Stop 게이트, 레시피로 검증). 전부 유동적 레시피로 연결됨.
 > 이후 고도화(정체 감지 튜닝, Planner 서브에이전트화 등)는 실전 쓰며 형욱과 조정.

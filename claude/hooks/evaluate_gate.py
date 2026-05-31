@@ -1,34 +1,28 @@
 #!/usr/bin/env python3
 """Stop hook: auto-evaluation gate (the PGE loop, deterministic + recipe-driven).
 
-Fires when Claude finishes a turn. If the project opted in and code changed, it
-RUNS the project's verification checks and blocks "done" until they pass. Verdict
-is bound to real exit codes.
+The gate is ON wherever the project declares a verification recipe — there is NO
+separate "enable" step to forget. When Claude finishes a turn and code changed, it
+runs the recipe and blocks "done" until every check passes (verdict bound to real
+exit codes). This kills the "claimed done without running the checks" failure mode.
 
-WHAT TO RUN is not hardcoded per stack — it is data the project declares, so any
-stack/domain works and changing stacks just means editing a file:
-
-    .claude/evaluate.recipe         # `name: shell command` per line; exit 0 = pass
-        tests: pytest -q
-        lint:  ruff check .
-        api:   curl -sf http://localhost:8000/health
-        db:    python scripts/check_db.py
-
-If no recipe file exists, falls back to auto-detect (python/node) for zero-config.
-Recipe commands run via the shell in the project root — only enable in repos you
-trust (same trust level as a Makefile / CI config).
+  Enable  = create `.claude/evaluate.recipe`  (e.g. via /wook-plan). `name: command`/line:
+      tests: pytest -q
+      lint:  ruff check .
+      api:   curl -sf http://localhost:8000/health
+  Disable = create `.claude/evaluate-off`  (escape hatch for a repo/checkout).
 
 Activation (all must hold, else it allows the stop cheaply):
-1. `.claude/evaluate-on-stop` marker exists in cwd or an ancestor (opt-in).
-   Its optional content is a comma list of check names to enforce on Stop
-   (subset of the recipe); empty => all checks.
-2. Code changed this session (uncommitted code files; non-git => assumed yes).
-3. At least one selected check is runnable.
+1. `.claude/evaluate-off` does NOT exist (project root or an ancestor).
+2. `.claude/evaluate.recipe` exists (its presence = gate active here).
+3. Code changed this session (uncommitted code files; non-git => assumed yes).
 
-Runaway / oscillation guard (§0-4): normalized failure SIGNATURE; same signature
-STALL_LIMIT times in a row => give up (stuck); changing failure resets stuck but
-total attempts cap at MAX_ATTEMPTS. Fresh stop resets the episode. CC's 8-block
-cap is a second net. Any internal error allows the stop (never trap the dev).
+Runaway/oscillation guard (§0-4): normalized failure signature; same signature
+STALL_LIMIT times in a row => give up (stuck); a changing failure resets stuck but
+total attempts cap at MAX_ATTEMPTS. A fresh stop resets the episode. Claude Code's
+own 8-block cap is a second net. Any internal error allows the stop (never trap the
+dev). Recipe commands run via the shell in the project root — only declare commands
+you trust (same trust level as a Makefile / CI config).
 """
 
 import hashlib
@@ -83,26 +77,22 @@ def give_up(msg: str) -> int:
     return 0
 
 
-# ---- running ---------------------------------------------------------------
+# ---- locating the project --------------------------------------------------
 
 
-def run(cmd, cwd: Path) -> tuple[int, str]:
-    """Run a check. str => shell command; list => direct exec."""
-    shell = isinstance(cmd, str)
-    try:
-        p = subprocess.run(
-            cmd, cwd=str(cwd), capture_output=True, text=True, timeout=280, shell=shell
-        )
-        return p.returncode, (p.stdout + p.stderr)
-    except Exception as e:
-        return 0, f"(could not run {cmd}: {e})"  # non-blocking
-
-
-# ---- what to verify --------------------------------------------------------
+def find_root(start: Path) -> Path:
+    """Nearest ancestor that has a `.claude` dir (where the recipe lives), else start."""
+    cur = start
+    for _ in range(40):
+        if (cur / ".claude").is_dir():
+            return cur
+        if cur.parent == cur:
+            break
+        cur = cur.parent
+    return start
 
 
 def load_recipe(root: Path) -> list[tuple[str, str]] | None:
-    """Read `.claude/evaluate.recipe` -> [(name, shell_command), ...] or None."""
     f = root / ".claude" / "evaluate.recipe"
     if not f.exists():
         return None
@@ -116,89 +106,25 @@ def load_recipe(root: Path) -> list[tuple[str, str]] | None:
         if not s or s.startswith("#") or ":" not in s:
             continue
         name, cmd = s.split(":", 1)
-        name, cmd = name.strip(), cmd.strip()
-        # strip trailing inline comment that starts with "  #"
-        cmd = re.split(r"\s+#", cmd, maxsplit=1)[0].strip()
+        name, cmd = name.strip(), re.split(r"\s+#", cmd.strip(), maxsplit=1)[0].strip()
         if name and cmd:
             checks.append((name, cmd))
     return checks or None
 
 
-def autodetect(root: Path) -> list[tuple[str, list[str]]]:
-    """Fallback when no recipe: detect python/node checks. names: tests|lint."""
-    checks: list[tuple[str, list[str]]] = []
-    pkg = root / "package.json"
-    scripts = {}
-    pm = "npm"
-    if pkg.exists():
-        try:
-            scripts = json.loads(pkg.read_text(encoding="utf-8")).get("scripts") or {}
-        except Exception:
-            pass
-        if (root / "pnpm-lock.yaml").exists():
-            pm = "pnpm"
-        elif (root / "yarn.lock").exists():
-            pm = "yarn"
-        if "test" in scripts:
-            checks.append(("tests", [pm, "test"]))
-        if "lint" in scripts:
-            checks.append(("lint", [pm, "run", "lint"]))
-        return checks
-
-    has_py = any(root.rglob("*.py"))
-    has_py_tests = any(root.rglob("test_*.py")) or any(root.rglob("*_test.py"))
-    if has_py_tests:
-        pytest_ok = run(["python", "-c", "import pytest"], root)[0] == 0
-        # -B: ignore stale .pyc so a just-edited file is re-read from source.
-        checks.append(
-            (
-                "tests",
-                ["python", "-B", "-m", "pytest", "-q"]
-                if pytest_ok
-                else ["python", "-B", "-m", "unittest", "discover"],
-            )
-        )
-    if has_py and run(["ruff", "--version"], root)[0] == 0:
-        checks.append(("lint", ["ruff", "check", "."]))
-    return checks
+# ---- running ---------------------------------------------------------------
 
 
-def get_checks(root: Path) -> list[tuple[str, object]]:
-    recipe = load_recipe(root)
-    if recipe is not None:
-        return list(recipe)
-    return list(autodetect(root))
-
-
-def marker_subset(marker_file: Path) -> set[str] | None:
+def run(cmd, cwd: Path) -> tuple[int, str]:
+    """str => shell command; list => direct exec."""
+    shell = isinstance(cmd, str)
     try:
-        text = marker_file.read_text(encoding="utf-8")
-    except Exception:
-        return None
-    names: set[str] = set()
-    for line in text.splitlines():
-        s = line.strip()
-        if not s or s.startswith("#"):
-            continue
-        for part in s.split(","):
-            part = part.strip()
-            if part:
-                names.add(part)
-    return names or None
-
-
-# ---- helpers ---------------------------------------------------------------
-
-
-def find_marker(start: Path) -> Path | None:
-    cur = start
-    for _ in range(40):
-        if (cur / ".claude" / "evaluate-on-stop").exists():
-            return cur
-        if cur.parent == cur:
-            break
-        cur = cur.parent
-    return None
+        p = subprocess.run(
+            cmd, cwd=str(cwd), capture_output=True, text=True, timeout=280, shell=shell
+        )
+        return p.returncode, (p.stdout + p.stderr)
+    except Exception as e:
+        return 0, f"(could not run {cmd}: {e})"  # non-blocking
 
 
 def code_changed(root: Path) -> bool:
@@ -258,19 +184,17 @@ def main() -> int:
         return allow()
 
     cwd = Path(event.get("cwd") or os.getcwd())
-    root = find_marker(cwd)
-    if root is None:
-        return allow()
+    root = find_root(cwd)
+
+    if (root / ".claude" / "evaluate-off").exists():
+        return allow()  # explicitly disabled here
+
+    checks = load_recipe(root)
+    if checks is None:
+        return allow()  # no recipe => gate not active in this project
 
     if not code_changed(root):
         reset_state(root)
-        return allow()
-
-    checks = get_checks(root)
-    subset = marker_subset(root / ".claude" / "evaluate-on-stop")
-    if subset is not None:
-        checks = [c for c in checks if c[0] in subset]
-    if not checks:
         return allow()
 
     if not event.get("stop_hook_active"):
@@ -280,8 +204,7 @@ def main() -> int:
     for name, cmd in checks:
         rc, out = run(cmd, root)
         if rc != 0:
-            shown = cmd if isinstance(cmd, str) else " ".join(cmd)
-            failures.append((name, shown, out))
+            failures.append((name, cmd, out))
 
     if not failures:
         reset_state(root)

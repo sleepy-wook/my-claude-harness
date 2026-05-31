@@ -1,9 +1,9 @@
 ---
-name: plan
-description: Turn a short request into a structured spec whose acceptance criteria are EXECUTABLE, then wire them into .claude/evaluate.recipe so the Evaluator (/evaluate) and the auto-gate verify exactly what was agreed. The front of the PGE loop. Use before implementing a feature or task. Triggers: "plan this", "write a spec", "define acceptance criteria", "what's the plan for".
+name: wook-plan
+description: Turn a short request into a structured spec whose acceptance criteria are EXECUTABLE, then wire them into .claude/evaluate.recipe so the Evaluator (/wook-evaluate) and the auto-gate verify exactly what was agreed. The front of the PGE loop. Use before implementing a medium-or-larger feature or task. Triggers: "plan this", "write a spec", "define acceptance criteria", "what's the plan for".
 ---
 
-# /plan — Planner (define "done" before coding)
+# /wook-plan — Planner (define "done" before coding)
 
 This is the FRONT of the Planner -> Generator -> Evaluator loop. Its job is to decide
 **what correct behaviour is, before any code**, and to express the acceptance criteria as
@@ -32,14 +32,16 @@ Generator implements; Evaluator/gate enforce it.
 4. **Get approval / edits** from the developer before writing anything.
 
 5. **On approval, write the artifacts:**
-   - Create or merge `.claude/evaluate.recipe` with the agreed checks.
+   - Create or merge `.claude/evaluate.recipe` with the agreed checks. **Writing this file
+     turns the auto-gate ON for this project automatically** — there is no separate enable
+     step (recipe present = gate active on every code-changing turn). Tell the developer the
+     gate is now on, and that `.claude/evaluate-off` disables it if ever needed.
    - Save the full spec to `.claude/plan.md` (so it survives context loss).
-   - Ask whether to enable the auto-gate now (`touch .claude/evaluate-on-stop`); if yes,
-     create it (optionally listing which checks should block on Stop).
 
 6. **Hand off to implementation.** Build against the spec. Do NOT claim done until the
-   recipe passes — `/evaluate` (or the auto-gate, if enabled) will run exactly these checks
-   and bind the verdict to real exit codes.
+   recipe passes — the auto-gate (now on) runs exactly these checks on every turn-end and
+   blocks "done" until they pass; `/wook-evaluate` gives a deeper on-demand verdict. Either
+   way the verdict is bound to real exit codes.
 
 ## Rules
 
