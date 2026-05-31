@@ -85,6 +85,10 @@ def main() -> int:
     print(f"{'DRY-RUN' if check else 'DEPLOY'}  source={SRC}  dest={DEST}")
     for kind, name, status in actions:
         print(f"  [{status:>10}] {kind}: {name}")
+    # In --check mode, signal drift (source not deployed) with a non-zero exit so it
+    # can act as a real gate criterion. An actual deploy always returns 0.
+    if check and any(status != "up-to-date" for _, _, status in actions):
+        return 1
     return 0
 
 

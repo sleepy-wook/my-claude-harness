@@ -1,0 +1,4 @@
+# claude-harness 자기검증 레시피 (이 파일 존재 = Stop 게이트 ON)
+# name: shell 명령  (exit 0 = 통과). 게이트와 /wook-evaluate가 이걸 실행한다.
+selfcheck: python tools/selfcheck.py
+deploy:    python deploy.py --check

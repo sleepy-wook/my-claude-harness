@@ -47,6 +47,7 @@
 | 2026-06-01 | #8 Planner = **skill `/wook-plan`**(수용 기준→레시피로 박음) | PGE 통합(generic 플래닝과 차별). 서브에이전트화는 나중 |
 | 2026-06-01 | 커스텀 스킬/에이전트 **`wook-` 접두사**(`/wook-plan`·`/wook-evaluate`·`wook-evaluator`) | 네이티브 plan 모드·플러그인과 충돌/혼동 제거(형욱 닉네임 네임스페이스) |
 | 2026-06-01 | 게이트 **default-ON by 레시피**(opt-in 마커 폐지, off=`.claude/evaluate-off`) | "켜는 걸 깜빡" 제거 — 레시피 존재=ON, `/wook-plan`이 레시피 보장 |
+| 2026-06-01 | **하네스 자기검증**(dogfood): `/wook-plan`으로 `.claude/evaluate.recipe`+`tools/selfcheck.py` 작성 | repo가 자기 무결성 검증. 게이트 통과/차단 둘 다 실증, `deploy --check`는 drift 시 exit 1로 개선 |
 
 ---
 
@@ -186,11 +187,13 @@ my-claude-harness/                  # git repo (비밀 0, 단순 blacklist .giti
 ├─ docs/{claude-harness-design, build-log}.md
 ├─ claude/                          # ~/.claude 산출물의 source of truth
 │  ├─ hooks/{guard_paths, format_py, inject_core_rules, evaluate_gate}.py
-│  ├─ harness/{core-rules.md, core-rules.README.md}
+│  ├─ harness/{core-rules.md, core-rules.README.md, evaluate.recipe.example}
 │  ├─ agents/wook-evaluator.md       # #5 Evaluator 서브에이전트
-│  ├─ skills/{evaluate, plan}/SKILL.md  # /wook-evaluate, /wook-plan 진입점
+│  ├─ skills/{wook-evaluate, wook-plan}/SKILL.md  # 진입점
 │  └─ settings.hooks.json           # 우리가 소유한 hooks 블록({HOOKS_DIR} placeholder)
-├─ deploy.py                        # claude/ -> ~/.claude 복사 + settings.json hooks 병합
+├─ deploy.py                        # claude/ -> ~/.claude 배포 (--check drift시 exit 1)
+├─ tools/selfcheck.py               # repo 자기검증(컴파일·settings·frontmatter·비밀)
+├─ .claude/{evaluate.recipe, plan.md}  # 이 repo 자신의 게이트 설정(자기검증 ON)
 └─ .gitignore
 ```
 
