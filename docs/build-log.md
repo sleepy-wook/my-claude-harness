@@ -68,14 +68,31 @@
   3. 불확실하면 추측 말고 멈추고 확인받기 선호
 - **편집법:** `core-rules.md` 고치면 다음 프롬프트부터 자동 반영(재시작 불필요).
 
+### ✅ #3 PreToolUse — 보호 경로 가드(deny)
+- **목적:** 절대 손대면 안 되는 파일(VCS 내부·자격증명·개인키)의 Edit/Write를 **실행 전 차단**.
+  deny는 권한 모드로도 못 뚫는 하드 게이트.
+- **파일:** `~/.claude/hooks/guard_paths.py` (PreToolUse JSON 파싱 → 보호 패턴이면
+  `permissionDecision:"deny"` + 이유, 아니면 무출력 exit 0 = 정상 흐름)
+- **설정:** `settings.json` → `PreToolUse` / matcher `Edit|Write` / exec form / timeout 15
+- **기본 보호 목록(초보수적, 오탐 0):** `.git/` 세그먼트, `*credentials*.json` /
+  `.credentials.json` / `secrets.json`, `*.pem` / `*.key` / `id_rsa` / `id_ed25519`
+  - `.gitignore`·`.gitattributes`는 차단 안 함(세그먼트 검사). 일반 `.py` 등 정상 통과.
+  - opt-in 주석: `.env`·lock 파일은 원하면 PROTECTED에서 주석 해제.
+- **검증:** 파이프 테스트 6/6 PASS(오탐 케이스 포함) → **실 세션 차단 증명**
+  (`server.pem` Write 시도 → deny로 막힘, 파일 생성 안 됨). ✅ live
+- **스코프 메모:** 결정론 deny는 *구체적 패턴*에 적합. "안 시킨 리팩터링/대량 생성" 같은
+  **의미 판단형 과잉행동은 여기서 안 다룬다**(오탐 폭발) → 판단 레이어(prompt/agent hook
+  또는 PGE)에서 다룰 것.
+
 ---
 
 ## 3. 파일 인벤토리 (`~/.claude`)
 
 ```
 ~/.claude/
-├─ settings.json                     # hooks 등록(PostToolUse, UserPromptSubmit)
+├─ settings.json                     # hooks 등록(PreToolUse, PostToolUse, UserPromptSubmit)
 ├─ hooks/
+│  ├─ guard_paths.py                  # #3 보호 경로 가드(deny)
 │  ├─ format_py.py                    # #1 자동 포맷
 │  └─ inject_core_rules.py            # #2 망각 방지 주입
 └─ harness/
@@ -96,7 +113,7 @@ my-claude-harness/                  # git repo (비밀 0, 단순 blacklist .giti
 ├─ CLAUDE.md                        # 이 repo 작업 시 컨벤션(build-log 갱신 등)
 ├─ docs/{claude-harness-design, build-log}.md
 ├─ claude/                          # ~/.claude 산출물의 source of truth
-│  ├─ hooks/{format_py, inject_core_rules}.py
+│  ├─ hooks/{guard_paths, format_py, inject_core_rules}.py
 │  ├─ harness/{core-rules.md, core-rules.README.md}
 │  └─ settings.hooks.json           # 우리가 소유한 hooks 블록({HOOKS_DIR} placeholder)
 ├─ deploy.py                        # claude/ -> ~/.claude 복사 + settings.json hooks 병합
@@ -122,7 +139,11 @@ my-claude-harness/                  # git repo (비밀 0, 단순 blacklist .giti
 - [x] #2 UserPromptSubmit 망각 방지
 - [x] git repo 구조 확립(별도 클린 repo + `deploy.py` 배포) + 로컬 첫 커밋
 - [x] public 원격 연결 + push → https://github.com/sleepy-wook/my-claude-harness
-- [ ] #3 PreToolUse 과잉행동 차단(deny) — 제일 까다로움, 설계 신중히
+- [x] #3 PreToolUse 보호 경로 가드(deny) — 구체적 패턴만 차단(오탐 0)
+- [ ] (#3 확장 후보) 위험 bash 명령 가드(`rm -rf`, `git push --force` 등) — 의논
+- [ ] (#3 의미형) "안 시킨 행동" 판단 차단 — 판단 레이어(PGE)에서, 결정론 deny ✗
+
+> **step A(결정론 바닥) 사실상 완료.** 다음은 B(판단 루프/PGE) — 형욱과 의논하며.
 
 **B. 판단 루프 (PGE) — 그 다음, 형욱과 의논하며**
 - [ ] #5 Evaluator 하나(컴퓨트 검증)부터
