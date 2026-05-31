@@ -44,6 +44,7 @@
 | 2026-05-31 | 자동화 = **Stop hook 게이트**(opt-in 마커, 테스트만, 재시도 3회) | 형욱 진짜 목표="알아서 호출". command형(싸고 결정론)·마커로 침습성 제어 |
 | 2026-06-01 | 게이트 고도화: **정체(시그니처) 감지 + 게이트 설정화 + `-B`** | 단순 N회 대신 진행/정체 구분(§0-4), 마커로 tests/lint/build 선택 |
 | 2026-06-01 | 검증 **레시피 구동**(`.claude/evaluate.recipe`, 폴백 자동탐지) | stack 하드코딩 ✗ → 프로젝트가 `name: 명령` 선언, 갈아끼움(§0-3). #6을 N개 레시피 대신 한 메커니즘으로 |
+| 2026-06-01 | #8 Planner = **skill `/plan`**(수용 기준→레시피로 박음) | PGE 통합(generic 플래닝과 차별). 서브에이전트화는 나중 |
 
 ---
 
@@ -133,6 +134,18 @@
 - **켜는 법:** 자동 게이트 원하는 repo에서 `touch .claude/evaluate-on-stop` (또는 "이 repo에
   게이트 켜줘"). 끄기 = 파일 삭제. **이 harness repo는 테스트가 없어 마커 둬도 발동 안 함.**
 
+### ✅ #8 Planner — `/plan` (PGE 삼각형 닫음)
+- **목적:** 코드 전에 **"올바른 동작이 뭔지"를 실행 가능한 수용 기준으로 정의** → 그걸
+  `.claude/evaluate.recipe`로 써서 Evaluator/게이트가 *정확히 그 기준*을 검증(§0-2).
+- **차별점:** generic 플래닝(예: superpowers `writing-plans`)과 달리 **PGE 통합** —
+  수용 기준 = 머신 체크 가능 형태 → 레시피로 박음. Plan이 기준 정의·기록까지.
+- **파일:** `~/.claude/skills/plan/SKILL.md` (`/plan` 진입점)
+- **흐름:** 모호하면 질문 → SPEC(범위/엣지/수용기준) 제시 → 기준을 `.claude/evaluate.recipe`로
+  번역·제안 → 승인 → 레시피 + `.claude/plan.md` 기록 + (선택)게이트 켜기 → 구현은 그 기준 통과까지.
+- **PGE 완성:** Plan(기준 정의·레시피 작성) → Generate(구현) → Evaluate/게이트(그 레시피로 검증).
+- **검증:** 배포·frontmatter 유효 확인. (스킬=프롬프트라 exit code 테스트 불가; 동작은 호출 시 발현)
+- **활성화:** 다음 재시작부터 `/plan` 호출 가능(스킬 목록 갱신 시 등록).
+
 ---
 
 ## 3. 파일 인벤토리 (`~/.claude`)
@@ -152,7 +165,8 @@
 ├─ agents/
 │  └─ evaluator.md                    # #5 독립 Evaluator 서브에이전트
 └─ skills/
-   └─ evaluate/SKILL.md               # /evaluate 진입점
+   ├─ evaluate/SKILL.md               # /evaluate 진입점
+   └─ plan/SKILL.md                   # #8 /plan (Planner)
 ```
 
 ---
@@ -171,7 +185,7 @@ my-claude-harness/                  # git repo (비밀 0, 단순 blacklist .giti
 │  ├─ hooks/{guard_paths, format_py, inject_core_rules, evaluate_gate}.py
 │  ├─ harness/{core-rules.md, core-rules.README.md}
 │  ├─ agents/evaluator.md            # #5 Evaluator 서브에이전트
-│  ├─ skills/evaluate/SKILL.md       # /evaluate 진입점
+│  ├─ skills/{evaluate, plan}/SKILL.md  # /evaluate, /plan 진입점
 │  └─ settings.hooks.json           # 우리가 소유한 hooks 블록({HOOKS_DIR} placeholder)
 ├─ deploy.py                        # claude/ -> ~/.claude 복사 + settings.json hooks 병합
 └─ .gitignore
@@ -207,6 +221,8 @@ my-claude-harness/                  # git repo (비밀 0, 단순 blacklist .giti
 - [x] #7 자동 게이트(Stop hook, opt-in 마커, 테스트만, 재시도 3회) — 시뮬레이션 4종 검증, live
 - [x] #6 도메인 레시피 = **유동적 레시피 구동**(`.claude/evaluate.recipe`, 하드코딩 ✗) — 어떤 stack/도메인이든 선언으로 갈아끼움. 실제 프로젝트에서 레시피 채우며 검증 예정
 - [x] #7-확장 정체 감지(시그니처 stuck/progress) + 게이트 설정화(tests/lint/build) + `-B` 견고성
-- [ ] #8 Planner / 풀 PGE (모델 강하면 단순 유지도 선택지)
+- [x] #8 Planner `/plan` — 수용 기준→`.claude/evaluate.recipe`로 박아 PGE 삼각형 닫음
 
-> 5~8은 확정 설계 아님. 형욱의 실제 작업 환경 물어보고 맞춰 정한다.
+> **PGE 루프 1차 완성**: Plan(`/plan`, 기준 정의·레시피 작성) → Generate(구현) →
+> Evaluate(`/evaluate` + Stop 게이트, 레시피로 검증). 전부 유동적 레시피로 연결됨.
+> 이후 고도화(정체 감지 튜닝, Planner 서브에이전트화 등)는 실전 쓰며 형욱과 조정.
