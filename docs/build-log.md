@@ -181,6 +181,7 @@ source of truth**이고, 산출물을 `~/.claude`로 *배포*한다. repo 폴더
 
 ```
 my-claude-harness/                  # git repo (비밀 0, 단순 blacklist .gitignore)
+├─ README.md                        # 사용법(최초 설정/계속 사용/원리)
 ├─ CLAUDE.md                        # 이 repo 작업 시 컨벤션(build-log 갱신 등)
 ├─ docs/{claude-harness-design, build-log}.md
 ├─ claude/                          # ~/.claude 산출물의 source of truth
