@@ -31,7 +31,9 @@ DEST = Path.home() / ".claude"
 HOOKS_DIR = (DEST / "hooks").as_posix()  # e.g. C:/Users/<you>/.claude/hooks
 SETTINGS = DEST / "settings.json"
 
-SUBDIRS = ("hooks", "harness")
+# Managed subtrees under claude/ that get mirrored into ~/.claude/.
+# Copied recursively so nested layouts (skills/<name>/SKILL.md) work.
+MANAGED_DIRS = ("hooks", "harness", "agents", "skills")
 
 
 def build_hooks_block() -> dict:
@@ -50,20 +52,20 @@ def main() -> int:
     check = "--check" in sys.argv[1:]
     actions = []
 
-    # 1+2. Copy script/rule files.
-    for sub in SUBDIRS:
+    # 1+2. Copy managed subtrees recursively (preserves nested structure).
+    for sub in MANAGED_DIRS:
         src_dir = SRC / sub
-        dest_dir = DEST / sub
-        for f in sorted(src_dir.iterdir()):
+        if not src_dir.exists():
+            continue
+        for f in sorted(src_dir.rglob("*")):
             if not f.is_file():
                 continue
-            target = dest_dir / f.name
+            rel = f.relative_to(SRC)  # e.g. skills/evaluate/SKILL.md
+            target = DEST / rel
             same = target.exists() and target.read_bytes() == f.read_bytes()
-            actions.append(
-                ("copy", f"{sub}/{f.name}", "up-to-date" if same else "update")
-            )
+            actions.append(("copy", rel.as_posix(), "up-to-date" if same else "update"))
             if not check and not same:
-                dest_dir.mkdir(parents=True, exist_ok=True)
+                target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(f, target)
 
     # 3. Merge the hooks key into settings.json (preserve everything else).

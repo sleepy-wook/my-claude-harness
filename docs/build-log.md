@@ -39,6 +39,8 @@
 | 2026-05-31 | 포매터 = **ruff(.py)부터**, 확장 가능 구조 | 이미 설치됨, 즉시 동작 |
 | 2026-05-31 | core-rules 시드 3개 확정(과잉행동·테스트·추측) | 형욱 확인("정확해") |
 | 2026-05-31 | git = **별도 깨끗한 repo + 배포** (`~/.claude` 직접 git ✗) | repo에 비밀 0 → 구조적 안전, §7 공개 대비, docs+코드 한 곳 |
+| 2026-05-31 | 작업 도메인 = **4개 전부**(일반코드·백엔드·프론트·DB) | Evaluator는 N개 ✗ → 하나 + 도메인별 레시피(§0-3) |
+| 2026-05-31 | 첫 Evaluator = **온디맨드 `/evaluate`**(일반코드 레시피부터) | Anthropic "Evaluator 하나부터", 위험 낮음, 신뢰 쌓이면 하드게이트 승격 |
 
 ---
 
@@ -86,6 +88,26 @@
 
 ---
 
+## 2-B. 판단 루프 (PGE) — 시작: Evaluator v1
+
+설계 §0-2/§8-B대로 **Evaluator 하나(컴퓨트 검증)부터.** "테스트 안 돌리고 됐다 함"을 정조준.
+
+### 🟡 #5 Evaluator v1 — 온디맨드 `/evaluate` (배포됨, 서브에이전트는 재시작 후 활성)
+- **형태:** `/evaluate`(skill, 진입점) → **독립 컨텍스트의 `evaluator` 서브에이전트** 디스패치.
+  코드 쓴 컨텍스트가 자기 코드를 칭찬 못 하도록 **평가자 분리**(§0-2).
+- **파일:**
+  - `~/.claude/agents/evaluator.md` — 도구 Bash·Read·Grep·Glob(**Edit/Write 없음** = 판정만, 안 고침)
+  - `~/.claude/skills/evaluate/SKILL.md` — `/evaluate` 진입점, 서브에이전트 디스패치 + 판정 정직 전달
+- **레시피(일반코드, 자동탐지):** Python(pytest 있으면 사용, 없으면 `python -m unittest`) +
+  `ruff check`; Node(package.json의 test/lint/build 스크립트). **판정은 실제 exit code에 묶음.**
+- **Iron law:** 실제 명령 실행 + exit 0을 본 것만 PASS. 테스트 못 찾으면 INCONCLUSIVE(거짓 PASS 금지).
+- **검증:** 레시피를 실제 샘플에 돌려 증명 — 통과 코드 → exit 0 → **PASS**, 버그 주입 →
+  exit 1 → **FAIL**(거짓 통과 불가). ✅ 레시피 동작
+- **⚠️ 활성화:** 서브에이전트는 세션 시작 시 로드 → **재시작/새 세션부터 디스패치 가능**(스킬은 즉시 등록).
+- **다음:** 백엔드/프론트/DB 레시피 추가, 그 뒤 하드게이트(Stop hook)나 `/goal` 승격은 의논.
+
+---
+
 ## 3. 파일 인벤토리 (`~/.claude`)
 
 ```
@@ -95,9 +117,13 @@
 │  ├─ guard_paths.py                  # #3 보호 경로 가드(deny)
 │  ├─ format_py.py                    # #1 자동 포맷
 │  └─ inject_core_rules.py            # #2 망각 방지 주입
-└─ harness/
-   ├─ core-rules.md                   # 주입되는 규칙(편집 대상)
-   └─ core-rules.README.md            # 규칙 작성 가이드
+├─ harness/
+│  ├─ core-rules.md                   # 주입되는 규칙(편집 대상)
+│  └─ core-rules.README.md            # 규칙 작성 가이드
+├─ agents/
+│  └─ evaluator.md                    # #5 독립 Evaluator 서브에이전트
+└─ skills/
+   └─ evaluate/SKILL.md               # /evaluate 진입점
 ```
 
 ---
@@ -115,13 +141,15 @@ my-claude-harness/                  # git repo (비밀 0, 단순 blacklist .giti
 ├─ claude/                          # ~/.claude 산출물의 source of truth
 │  ├─ hooks/{guard_paths, format_py, inject_core_rules}.py
 │  ├─ harness/{core-rules.md, core-rules.README.md}
+│  ├─ agents/evaluator.md            # #5 Evaluator 서브에이전트
+│  ├─ skills/evaluate/SKILL.md       # /evaluate 진입점
 │  └─ settings.hooks.json           # 우리가 소유한 hooks 블록({HOOKS_DIR} placeholder)
 ├─ deploy.py                        # claude/ -> ~/.claude 복사 + settings.json hooks 병합
 └─ .gitignore
 ```
 
 **배포(`deploy.py`):**
-- `claude/hooks/*`, `claude/harness/*` → `~/.claude/`로 복사
+- `claude/{hooks,harness,agents,skills}/**` → `~/.claude/`로 (중첩 구조 보존) 복사
 - `settings.hooks.json`의 `{HOOKS_DIR}`를 **현재 머신의 실제 경로**로 치환 → `hooks` 키만
   `~/.claude/settings.json`에 병합(다른 키 보존). → **다른 PC에서 clone해도 경로 자동 정확.**
 - **멱등**: `python deploy.py` 반복해도 동일. `python deploy.py --check`는 dry-run(미기록).
@@ -145,10 +173,10 @@ my-claude-harness/                  # git repo (비밀 0, 단순 blacklist .giti
 
 > **step A(결정론 바닥) 사실상 완료.** 다음은 B(판단 루프/PGE) — 형욱과 의논하며.
 
-**B. 판단 루프 (PGE) — 그 다음, 형욱과 의논하며**
-- [ ] #5 Evaluator 하나(컴퓨트 검증)부터
-- [ ] #6 도메인별 검증 레시피 (의논 필요)
-- [ ] #7 반복 루프 안전장치 (의논 필요)
+**B. 판단 루프 (PGE) — 진행 중, 형욱과 의논하며**
+- [x] #5 Evaluator v1 (온디맨드 `/evaluate`, 일반코드 레시피) — 레시피 검증됨, 재시작 후 서브에이전트 활성
+- [ ] #6 도메인별 레시피 확장(백엔드 API / 프론트 브라우저 / DB 쿼리) — 의논
+- [ ] #7 반복 루프 안전장치(최대 횟수·정체 감지·하드 게이트 or `/goal`) — 의논
 - [ ] #8 Planner / 풀 PGE (모델 강하면 단순 유지도 선택지)
 
 > 5~8은 확정 설계 아님. 형욱의 실제 작업 환경 물어보고 맞춰 정한다.
