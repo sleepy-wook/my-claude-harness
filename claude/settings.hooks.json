@@ -40,6 +40,19 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": ["{HOOKS_DIR}/evaluate_gate.py"],
+            "timeout": 300,
+            "statusMessage": "auto-evaluate gate"
+          }
+        ]
+      }
     ]
   }
 }

@@ -41,6 +41,7 @@
 | 2026-05-31 | git = **별도 깨끗한 repo + 배포** (`~/.claude` 직접 git ✗) | repo에 비밀 0 → 구조적 안전, §7 공개 대비, docs+코드 한 곳 |
 | 2026-05-31 | 작업 도메인 = **4개 전부**(일반코드·백엔드·프론트·DB) | Evaluator는 N개 ✗ → 하나 + 도메인별 레시피(§0-3) |
 | 2026-05-31 | 첫 Evaluator = **온디맨드 `/evaluate`**(일반코드 레시피부터) | Anthropic "Evaluator 하나부터", 위험 낮음, 신뢰 쌓이면 하드게이트 승격 |
+| 2026-05-31 | 자동화 = **Stop hook 게이트**(opt-in 마커, 테스트만, 재시도 3회) | 형욱 진짜 목표="알아서 호출". command형(싸고 결정론)·마커로 침습성 제어 |
 
 ---
 
@@ -104,7 +105,24 @@
 - **검증:** 레시피를 실제 샘플에 돌려 증명 — 통과 코드 → exit 0 → **PASS**, 버그 주입 →
   exit 1 → **FAIL**(거짓 통과 불가). ✅ 레시피 동작
 - **⚠️ 활성화:** 서브에이전트는 세션 시작 시 로드 → **재시작/새 세션부터 디스패치 가능**(스킬은 즉시 등록).
-- **다음:** 백엔드/프론트/DB 레시피 추가, 그 뒤 하드게이트(Stop hook)나 `/goal` 승격은 의논.
+- **다음:** 백엔드/프론트/DB 레시피 추가(#6).
+
+### ✅ #7 자동 게이트 — Stop hook (generate → 자동 evaluate 루프)
+- **목적:** 형욱이 원한 핵심 — **수동 `/evaluate` 아니라 harness가 알아서**. 턴이 끝날 때
+  자동으로 테스트를 돌려 미통과면 "완료"를 막고 자동으로 계속 작업. (§0-4 반복 루프)
+- **파일:** `~/.claude/hooks/evaluate_gate.py` (`type:"command"` Stop hook, exec form, timeout 300)
+- **왜 command(스크립트)인가:** 매 턴 발동하니 **싸고 결정론적**이어야. LLM 안 씀. 판정은 실제
+  exit code, 실패 시 테스트 출력 그대로 피드백. (깊은 분석은 `/evaluate`의 LLM evaluator)
+- **발동 조건(opt-in, 3중 게이트):** ① cwd/상위에 **`.claude/evaluate-on-stop` 마커** 존재
+  ② **코드 변경**(git status) ③ **테스트 존재**. 아니면 즉시 통과(거의 공짜) → 일반 대화·계획·
+  마커 없는 repo엔 영향 0.
+- **블로킹 게이트 = 테스트만**(핵심 통증 정조준). 린트/빌드는 `/evaluate`로 온디맨드.
+- **런어웨이 가드(§0-4):** 연속 **3회** 실패 시 자동 루프 포기 + systemMessage로 사용자 호출.
+  `stop_hook_active` false(새 stop)면 카운터 리셋. Claude Code 내장 8-cap이 2차 안전망.
+- **검증:** 시뮬레이션 Stop 이벤트 4종 — 마커없음→allow / 통과→allow / 실패→`decision:block`(
+  실제 `AssertionError` 출력 포함) / 연속3회→give up(systemMessage). 전부 PASS. ✅ live
+- **켜는 법:** 자동 게이트 원하는 repo에서 `touch .claude/evaluate-on-stop` (또는 "이 repo에
+  게이트 켜줘"). 끄기 = 파일 삭제. **이 harness repo는 테스트가 없어 마커 둬도 발동 안 함.**
 
 ---
 
@@ -112,11 +130,12 @@
 
 ```
 ~/.claude/
-├─ settings.json                     # hooks 등록(PreToolUse, PostToolUse, UserPromptSubmit)
+├─ settings.json                     # hooks 등록(PreToolUse, PostToolUse, UserPromptSubmit, Stop)
 ├─ hooks/
 │  ├─ guard_paths.py                  # #3 보호 경로 가드(deny)
 │  ├─ format_py.py                    # #1 자동 포맷
-│  └─ inject_core_rules.py            # #2 망각 방지 주입
+│  ├─ inject_core_rules.py            # #2 망각 방지 주입
+│  └─ evaluate_gate.py                # #7 자동 게이트(Stop hook)
 ├─ harness/
 │  ├─ core-rules.md                   # 주입되는 규칙(편집 대상)
 │  └─ core-rules.README.md            # 규칙 작성 가이드
@@ -139,7 +158,7 @@ my-claude-harness/                  # git repo (비밀 0, 단순 blacklist .giti
 ├─ CLAUDE.md                        # 이 repo 작업 시 컨벤션(build-log 갱신 등)
 ├─ docs/{claude-harness-design, build-log}.md
 ├─ claude/                          # ~/.claude 산출물의 source of truth
-│  ├─ hooks/{guard_paths, format_py, inject_core_rules}.py
+│  ├─ hooks/{guard_paths, format_py, inject_core_rules, evaluate_gate}.py
 │  ├─ harness/{core-rules.md, core-rules.README.md}
 │  ├─ agents/evaluator.md            # #5 Evaluator 서브에이전트
 │  ├─ skills/evaluate/SKILL.md       # /evaluate 진입점
@@ -175,8 +194,9 @@ my-claude-harness/                  # git repo (비밀 0, 단순 blacklist .giti
 
 **B. 판단 루프 (PGE) — 진행 중, 형욱과 의논하며**
 - [x] #5 Evaluator v1 (온디맨드 `/evaluate`, 일반코드 레시피) — 레시피 검증됨, 재시작 후 서브에이전트 활성
+- [x] #7 자동 게이트(Stop hook, opt-in 마커, 테스트만, 재시도 3회) — 시뮬레이션 4종 검증, live
 - [ ] #6 도메인별 레시피 확장(백엔드 API / 프론트 브라우저 / DB 쿼리) — 의논
-- [ ] #7 반복 루프 안전장치(최대 횟수·정체 감지·하드 게이트 or `/goal`) — 의논
+- [ ] #7-확장 정체 감지 고도화(같은 실패 반복 식별), 린트/빌드도 게이트할지 — 의논
 - [ ] #8 Planner / 풀 PGE (모델 강하면 단순 유지도 선택지)
 
 > 5~8은 확정 설계 아님. 형욱의 실제 작업 환경 물어보고 맞춰 정한다.
