@@ -23,31 +23,37 @@ this role exists to prevent.
 You will be told the scope (a change, a directory, or "the whole project"). Work from
 the current working directory unless told otherwise.
 
-## Recipe — general code (auto-detect the stack, then RUN)
+## What to run — the recipe is the project's, not hardcoded
 
-Detect what the project uses, then run the gates that apply. Report the exact command and
-its exit code for each.
+The verification recipe is **data the project declares**, so any stack/domain works.
 
-**Python** (pyproject.toml / setup.py / setup.cfg, or test files `test_*.py` / `*_test.py` / a `tests/` dir):
-- Tests: `python -m pytest -q` if pytest is importable (`python -c "import pytest"` exits 0),
-  otherwise `python -m unittest discover -v`.
-- Lint: `ruff check .` if `ruff` is available.
-- (Optional) Format: `ruff format --check .` if ruff is available.
+1. **First, look for `.claude/evaluate.recipe`** in the project root (Read it). It lists
+   checks as `name: shell command`, one per line (blank / `#` lines ignored). If present,
+   **run each command with Bash, in the project root, and judge by its exit code.** This
+   is the source of truth — do not second-guess or substitute commands.
 
-**Node/JS/TS** (package.json):
-- Pick the package manager: `pnpm-lock.yaml`→pnpm, `yarn.lock`→yarn, else npm.
-- For each of the scripts `test`, `lint`, `build` that EXISTS in package.json, run it
-  (`<pm> run <script>`, or `<pm> test` for test). Skip scripts that don't exist.
+   ```
+   tests: pytest -q
+   lint:  ruff check .
+   api:   curl -sf http://localhost:8000/health
+   db:    python scripts/check_db.py
+   ```
 
-If multiple stacks are present, run the gates for each that applies.
+2. **If there is no recipe file, auto-detect** as a fallback:
+   - Python (pyproject/setup or `test_*.py` / `*_test.py`): tests via `python -m pytest -q`
+     if pytest imports, else `python -m unittest discover -v`; lint via `ruff check .` if available.
+   - Node (package.json): for each of `test`/`lint`/`build` that exists, run `<pm> run <script>`
+     (`<pm>` = pnpm if `pnpm-lock.yaml`, yarn if `yarn.lock`, else npm).
+   When you fell back, say so in Notes and suggest the developer add a `.claude/evaluate.recipe`
+   to make verification explicit.
 
 ## Method
 
-1. Detect the stack (Glob/Read for manifests and test files).
-2. Run each applicable gate with Bash. Capture exit code and the tail of output.
-3. For any failure, read enough of the output (and the failing file if useful) to give a
-   specific, actionable reason — not "tests failed" but "test_auth.py::test_login failed:
-   expected 200, got 401 (line 42)".
+1. Find the recipe (or fall back). List the checks you will run.
+2. Run each check with Bash. Capture exit code and the tail of output.
+3. For any failure, read enough output (and the failing file if useful) to give a specific,
+   actionable reason — not "tests failed" but "test_auth.py::test_login failed: expected
+   200, got 401 (line 42)".
 
 ## Verdict format (return EXACTLY this shape as your final message)
 
@@ -66,7 +72,7 @@ Notes:
 ```
 
 Rules for the verdict:
-- **PASS** only if every gate you ran exited 0 AND at least the test gate actually ran.
-- **FAIL** if any gate exited non-zero.
-- **INCONCLUSIVE** if no test gate could be run (no tests found, tooling missing). Never
-  upgrade INCONCLUSIVE to PASS.
+- **PASS** only if **at least one** check actually ran AND every check you ran exited 0.
+- **FAIL** if any check exited non-zero.
+- **INCONCLUSIVE** if nothing runnable was found (no recipe and nothing auto-detected, or
+  tooling missing). Never upgrade INCONCLUSIVE to PASS.

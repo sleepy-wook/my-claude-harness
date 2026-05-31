@@ -1,0 +1,32 @@
+# evaluate.recipe — 검증 레시피 (예시/템플릿)
+#
+# 이 파일을 프로젝트 루트의 `.claude/evaluate.recipe`로 복사해서 그 프로젝트에 맞게
+# 고쳐 쓴다. 하네스는 stack을 추측하지 않고, 여기 적힌 명령을 그대로 실행해서
+# **실제 exit code(0=통과)**로 판정한다. stack/도메인이 바뀌면 이 파일만 고치면 된다.
+#
+# 형식: `name: shell 명령`  (한 줄에 하나, 빈 줄과 #주석 무시, 인라인 `  #주석` 허용)
+# 누가 읽나:
+#   - /evaluate (온디맨드, 독립 컨텍스트 evaluator): 전체 체크 실행
+#   - 자동 게이트(Stop hook): .claude/evaluate-on-stop 마커가 있을 때 실행
+#     (마커에 체크 이름을 적으면 그 부분집합만 stop에서 막음; 비우면 전체)
+# 주의: 명령은 셸로 실행된다. 신뢰하는 repo에서만 게이트를 켤 것(Makefile/CI와 동급).
+#
+# ---- 예시: 골라서 쓰고 나머진 지워라 ----
+
+# 일반 코드
+tests: pytest -q
+lint:  ruff check .
+
+# 백엔드 / API (서버가 떠 있어야 하면 별도로 띄워두고)
+# api:   curl -sf http://localhost:8000/health
+# api2:  curl -sf http://localhost:8000/users | python -c "import sys,json; assert json.load(sys.stdin)"
+
+# DB / 데이터 (쿼리 결과를 기댓값과 대조하는 스크립트의 exit code로)
+# db:    python scripts/check_db.py
+
+# 빌드 / 타입체크
+# build: npm run build
+# types: npx tsc --noEmit
+
+# 프론트엔드 (예: Playwright 등 헤드리스 검증 스크립트)
+# e2e:   npx playwright test

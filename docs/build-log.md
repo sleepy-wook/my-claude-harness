@@ -43,6 +43,7 @@
 | 2026-05-31 | 첫 Evaluator = **온디맨드 `/evaluate`**(일반코드 레시피부터) | Anthropic "Evaluator 하나부터", 위험 낮음, 신뢰 쌓이면 하드게이트 승격 |
 | 2026-05-31 | 자동화 = **Stop hook 게이트**(opt-in 마커, 테스트만, 재시도 3회) | 형욱 진짜 목표="알아서 호출". command형(싸고 결정론)·마커로 침습성 제어 |
 | 2026-06-01 | 게이트 고도화: **정체(시그니처) 감지 + 게이트 설정화 + `-B`** | 단순 N회 대신 진행/정체 구분(§0-4), 마커로 tests/lint/build 선택 |
+| 2026-06-01 | 검증 **레시피 구동**(`.claude/evaluate.recipe`, 폴백 자동탐지) | stack 하드코딩 ✗ → 프로젝트가 `name: 명령` 선언, 갈아끼움(§0-3). #6을 N개 레시피 대신 한 메커니즘으로 |
 
 ---
 
@@ -100,8 +101,8 @@
 - **파일:**
   - `~/.claude/agents/evaluator.md` — 도구 Bash·Read·Grep·Glob(**Edit/Write 없음** = 판정만, 안 고침)
   - `~/.claude/skills/evaluate/SKILL.md` — `/evaluate` 진입점, 서브에이전트 디스패치 + 판정 정직 전달
-- **레시피(일반코드, 자동탐지):** Python(pytest 있으면 사용, 없으면 `python -m unittest`) +
-  `ruff check`; Node(package.json의 test/lint/build 스크립트). **판정은 실제 exit code에 묶음.**
+- **레시피 구동:** 먼저 `.claude/evaluate.recipe`(프로젝트가 선언한 `name: 명령`)를 읽어 실행,
+  없으면 자동탐지(python/node) 폴백. **판정은 실제 exit code에 묶음.** stack 하드코딩 안 함.
 - **Iron law:** 실제 명령 실행 + exit 0을 본 것만 PASS. 테스트 못 찾으면 INCONCLUSIVE(거짓 PASS 금지).
 - **검증:** 레시피를 실제 샘플에 돌려 증명 — 통과 코드 → exit 0 → **PASS**, 버그 주입 →
   exit 1 → **FAIL**(거짓 통과 불가). ✅ 레시피 동작
@@ -117,8 +118,9 @@
 - **발동 조건(opt-in, 3중 게이트):** ① cwd/상위에 **`.claude/evaluate-on-stop` 마커** 존재
   ② **코드 변경**(git status) ③ **테스트 존재**. 아니면 즉시 통과(거의 공짜) → 일반 대화·계획·
   마커 없는 repo엔 영향 0.
-- **게이트 항목 설정화:** 마커 빈 파일=tests만. `gates: tests, lint, build` 줄을 넣으면 그것만
-  블로킹. (python: ruff check=lint / Node: package.json의 test·lint·build 스크립트)
+- **검증 레시피(유동적):** `.claude/evaluate.recipe`에 `name: 셸명령` 선언(어떤 stack/도메인이든) →
+  게이트가 그걸 실행. 없으면 자동탐지(python/node) 폴백. 마커에 체크 이름 적으면 stop에서 그
+  부분집합만 블로킹(비우면 전체). 템플릿: `~/.claude/harness/evaluate.recipe.example`
 - **런어웨이·정체 가드(§0-4, 고도화):**
   - 실패마다 **정규화 시그니처**(숫자·타이밍 제거) 계산.
   - **같은 시그니처 3회 연속(stuck)** → 정체로 판단, 자동 루프 포기(systemMessage).
@@ -145,7 +147,8 @@
 │  └─ evaluate_gate.py                # #7 자동 게이트(Stop hook)
 ├─ harness/
 │  ├─ core-rules.md                   # 주입되는 규칙(편집 대상)
-│  └─ core-rules.README.md            # 규칙 작성 가이드
+│  ├─ core-rules.README.md            # 규칙 작성 가이드
+│  └─ evaluate.recipe.example         # 검증 레시피 템플릿(프로젝트로 복사)
 ├─ agents/
 │  └─ evaluator.md                    # #5 독립 Evaluator 서브에이전트
 └─ skills/
@@ -202,7 +205,7 @@ my-claude-harness/                  # git repo (비밀 0, 단순 blacklist .giti
 **B. 판단 루프 (PGE) — 진행 중, 형욱과 의논하며**
 - [x] #5 Evaluator v1 (온디맨드 `/evaluate`, 일반코드 레시피) — 레시피 검증됨, 재시작 후 서브에이전트 활성
 - [x] #7 자동 게이트(Stop hook, opt-in 마커, 테스트만, 재시도 3회) — 시뮬레이션 4종 검증, live
-- [ ] #6 도메인별 레시피 확장(백엔드 API / 프론트 브라우저 / DB 쿼리) — 의논
+- [x] #6 도메인 레시피 = **유동적 레시피 구동**(`.claude/evaluate.recipe`, 하드코딩 ✗) — 어떤 stack/도메인이든 선언으로 갈아끼움. 실제 프로젝트에서 레시피 채우며 검증 예정
 - [x] #7-확장 정체 감지(시그니처 stuck/progress) + 게이트 설정화(tests/lint/build) + `-B` 견고성
 - [ ] #8 Planner / 풀 PGE (모델 강하면 단순 유지도 선택지)
 
