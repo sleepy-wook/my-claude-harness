@@ -112,7 +112,8 @@ my-claude-harness/                  # git repo (비밀 0, 단순 blacklist .giti
 
 **새 환경 복원:** clone → `python deploy.py` → `~/.claude`에 harness 깔림.
 
-> ⚠️ 아직 원격(remote) 없음. push하려면 **private repo**로 만든 뒤(설계 §6) push.
+> 원격: https://github.com/sleepy-wook/my-claude-harness (**public** — repo에 비밀 0이라
+> 구조적으로 안전, 설계 §7 공개 포트폴리오와 부합). 일상 동기화: `git pull` / `git push`.
 
 ## 5. 다음 스텝 (설계 §8)
 
@@ -120,7 +121,7 @@ my-claude-harness/                  # git repo (비밀 0, 단순 blacklist .giti
 - [x] #1 PostToolUse 자동 포맷
 - [x] #2 UserPromptSubmit 망각 방지
 - [x] git repo 구조 확립(별도 클린 repo + `deploy.py` 배포) + 로컬 첫 커밋
-- [ ] (선택) private 원격 연결 + push
+- [x] public 원격 연결 + push → https://github.com/sleepy-wook/my-claude-harness
 - [ ] #3 PreToolUse 과잉행동 차단(deny) — 제일 까다로움, 설계 신중히
 
 **B. 판단 루프 (PGE) — 그 다음, 형욱과 의논하며**
