@@ -3,7 +3,7 @@
 > 설계 명세는 `claude-harness-design.md`(= source of truth). 이 문서는 **실제로 무엇을
 > 만들었는지** 추적하는 살아있는 기록이다. 스텝마다 갱신한다.
 >
-> 최종 갱신: 2026-05-31
+> 최종 갱신: 2026-06-01
 
 ---
 
@@ -42,6 +42,7 @@
 | 2026-05-31 | 작업 도메인 = **4개 전부**(일반코드·백엔드·프론트·DB) | Evaluator는 N개 ✗ → 하나 + 도메인별 레시피(§0-3) |
 | 2026-05-31 | 첫 Evaluator = **온디맨드 `/evaluate`**(일반코드 레시피부터) | Anthropic "Evaluator 하나부터", 위험 낮음, 신뢰 쌓이면 하드게이트 승격 |
 | 2026-05-31 | 자동화 = **Stop hook 게이트**(opt-in 마커, 테스트만, 재시도 3회) | 형욱 진짜 목표="알아서 호출". command형(싸고 결정론)·마커로 침습성 제어 |
+| 2026-06-01 | 게이트 고도화: **정체(시그니처) 감지 + 게이트 설정화 + `-B`** | 단순 N회 대신 진행/정체 구분(§0-4), 마커로 tests/lint/build 선택 |
 
 ---
 
@@ -116,11 +117,17 @@
 - **발동 조건(opt-in, 3중 게이트):** ① cwd/상위에 **`.claude/evaluate-on-stop` 마커** 존재
   ② **코드 변경**(git status) ③ **테스트 존재**. 아니면 즉시 통과(거의 공짜) → 일반 대화·계획·
   마커 없는 repo엔 영향 0.
-- **블로킹 게이트 = 테스트만**(핵심 통증 정조준). 린트/빌드는 `/evaluate`로 온디맨드.
-- **런어웨이 가드(§0-4):** 연속 **3회** 실패 시 자동 루프 포기 + systemMessage로 사용자 호출.
-  `stop_hook_active` false(새 stop)면 카운터 리셋. Claude Code 내장 8-cap이 2차 안전망.
-- **검증:** 시뮬레이션 Stop 이벤트 4종 — 마커없음→allow / 통과→allow / 실패→`decision:block`(
-  실제 `AssertionError` 출력 포함) / 연속3회→give up(systemMessage). 전부 PASS. ✅ live
+- **게이트 항목 설정화:** 마커 빈 파일=tests만. `gates: tests, lint, build` 줄을 넣으면 그것만
+  블로킹. (python: ruff check=lint / Node: package.json의 test·lint·build 스크립트)
+- **런어웨이·정체 가드(§0-4, 고도화):**
+  - 실패마다 **정규화 시그니처**(숫자·타이밍 제거) 계산.
+  - **같은 시그니처 3회 연속(stuck)** → 정체로 판단, 자동 루프 포기(systemMessage).
+  - 시그니처 **바뀌면**(진행 중) stuck 리셋 → 더 인내하되 **총 5회(MAX) 상한**.
+  - 새 stop(`stop_hook_active` false)이면 에피소드 리셋. Claude Code 내장 8-cap이 2차망.
+- **견고성:** 테스트 러너는 `python -B`(stale `.pyc` 무시) → 방금 편집한 코드를 항상 소스에서 재읽음.
+- **검증(시뮬레이션 Stop 이벤트):** 마커없음/통과→allow, 실패→block(실제 출력), 같은실패 1→2→3회=
+  stall give-up, 실패 바뀌면 "new"로 stuck 리셋(진행 감지), `gates: tests,lint`+미사용 import→lint로
+  block, `-B`로 즉시-교체도 정확. 전부 PASS. ✅ live
 - **켜는 법:** 자동 게이트 원하는 repo에서 `touch .claude/evaluate-on-stop` (또는 "이 repo에
   게이트 켜줘"). 끄기 = 파일 삭제. **이 harness repo는 테스트가 없어 마커 둬도 발동 안 함.**
 
@@ -196,7 +203,7 @@ my-claude-harness/                  # git repo (비밀 0, 단순 blacklist .giti
 - [x] #5 Evaluator v1 (온디맨드 `/evaluate`, 일반코드 레시피) — 레시피 검증됨, 재시작 후 서브에이전트 활성
 - [x] #7 자동 게이트(Stop hook, opt-in 마커, 테스트만, 재시도 3회) — 시뮬레이션 4종 검증, live
 - [ ] #6 도메인별 레시피 확장(백엔드 API / 프론트 브라우저 / DB 쿼리) — 의논
-- [ ] #7-확장 정체 감지 고도화(같은 실패 반복 식별), 린트/빌드도 게이트할지 — 의논
+- [x] #7-확장 정체 감지(시그니처 stuck/progress) + 게이트 설정화(tests/lint/build) + `-B` 견고성
 - [ ] #8 Planner / 풀 PGE (모델 강하면 단순 유지도 선택지)
 
 > 5~8은 확정 설계 아님. 형욱의 실제 작업 환경 물어보고 맞춰 정한다.

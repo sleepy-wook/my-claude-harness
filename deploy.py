@@ -60,6 +60,8 @@ def main() -> int:
         for f in sorted(src_dir.rglob("*")):
             if not f.is_file():
                 continue
+            if "__pycache__" in f.parts or f.suffix == ".pyc":
+                continue  # never deploy bytecode caches
             rel = f.relative_to(SRC)  # e.g. skills/evaluate/SKILL.md
             target = DEST / rel
             same = target.exists() and target.read_bytes() == f.read_bytes()
