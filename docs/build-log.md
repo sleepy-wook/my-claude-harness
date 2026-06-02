@@ -49,6 +49,8 @@
 | 2026-06-01 | 게이트 **default-ON by 레시피**(opt-in 마커 폐지, off=`.claude/evaluate-off`) | "켜는 걸 깜빡" 제거 — 레시피 존재=ON, `/wook-plan`이 레시피 보장 |
 | 2026-06-01 | **하네스 자기검증**(dogfood): `/wook-plan`으로 `.claude/evaluate.recipe`+`tools/selfcheck.py` 작성 | repo가 자기 무결성 검증. 게이트 통과/차단 둘 다 실증, `deploy --check`는 drift 시 exit 1로 개선 |
 | 2026-06-02 | core-rules 4번째 규칙 추가(신규 구현 요청 시 `/wook-plan` 제안) | 매 프롬프트 주입되는 규칙으로 PGE Plan 단계를 자연 유도 — 게이트 default-ON(레시피 존재=ON)과 맞물림 |
+| 2026-06-02 | `/wook-brainstorm` 신설(PGE 앞단 발산), plan과 별도 스킬로 분리 | plan=수렴(recipe), brainstorm=발산 — 본질이 달라 분리 가치 有. 크기/도메인별 분할은 호출 결정비용만 키워 회피(plan 내부 흡수) |
+| 2026-06-02 | sub-agent를 PGE 너머 *읽기 전용 전문가 풀*로 확장하는 방향 합의 | "쓰기=메인 단일 스레드, 읽기/판정=sub-agent"(§0-3). evaluator가 1번 멤버, brainstorm fan-out이 응용. 대량 신설 대신 필요 시 1개씩(over-build 회피) |
 
 ---
 
@@ -151,6 +153,21 @@
 - **검증:** 배포·frontmatter 유효 확인. (스킬=프롬프트라 exit code 테스트 불가; 동작은 호출 시 발현)
 - **활성화:** 다음 재시작부터 `/wook-plan` 호출 가능(스킬 목록 갱신 시 등록).
 
+### ✅ #9 Brainstorm — `/wook-brainstorm` (PGE 앞단 발산)
+- **목적:** plan이 *수렴*(수용기준→recipe)이라면, brainstorm은 *발산* — 문제/접근이 아직
+  열린 단계에서 **옵션을 넓히고 트레이드오프를 드러낸다.** 코드·recipe 둘 다 만들지 않음
+  (성급한 recipe = 틀린 기준 고착). 방향이 잡히면 `/wook-plan`으로 핸드오프.
+- **파일:** `~/.claude/skills/wook-brainstorm/SKILL.md` (`/wook-brainstorm` 진입점)
+- **흐름:** 문제 프레이밍(모호하면 질문) → 서로 다른 접근 2~4개(최소 1개는 의외의 것) →
+  정직한 비교(축: 단순성·위험·노력·가역성·harness 적합) → 추천(단 결정은 개발자) → plan 핸드오프.
+- **sub-agent 확장(형욱 직감 반영):** 발산 단계에서 **읽기 전용 sub-agent로 fan-out** 명시
+  — Explore/general-purpose로 기존 코드베이스 매핑, research 에이전트로 외부 prior art.
+  "쓰기는 메인 단일 스레드, 읽기/판정은 sub-agent"라는 안전 패턴(§0-3 LangChain)의 적용.
+  evaluator(읽기·실행·판정, write 없음)에 이은 *읽기 전용 전문가 풀*의 두 번째 자리.
+- **검증:** `python tools/selfcheck.py` exit 0(5 scripts compile, 4 md frontmatter ok —
+  brainstorm 포함). `deploy --check`는 이 임시 컨테이너에 미배포라 drift exit 1(변경 무관).
+- **활성화:** 다음 재시작부터 `/wook-brainstorm` 호출 가능.
+
 ---
 
 ## 3. 파일 인벤토리 (`~/.claude`)
@@ -170,8 +187,9 @@
 ├─ agents/
 │  └─ wook-evaluator.md               # #5 독립 Evaluator 서브에이전트
 └─ skills/
-   ├─ evaluate/SKILL.md               # /wook-evaluate 진입점
-   └─ plan/SKILL.md                   # #8 /wook-plan (Planner)
+   ├─ wook-evaluate/SKILL.md          # /wook-evaluate 진입점
+   ├─ wook-plan/SKILL.md              # #8 /wook-plan (Planner)
+   └─ wook-brainstorm/SKILL.md        # #9 /wook-brainstorm (발산, PGE 앞단)
 ```
 
 ---
@@ -191,7 +209,7 @@ my-claude-harness/                  # git repo (비밀 0, 단순 blacklist .giti
 │  ├─ hooks/{guard_paths, format_py, inject_core_rules, evaluate_gate}.py
 │  ├─ harness/{core-rules.md, core-rules.README.md, evaluate.recipe.example}
 │  ├─ agents/wook-evaluator.md       # #5 Evaluator 서브에이전트
-│  ├─ skills/{wook-evaluate, wook-plan}/SKILL.md  # 진입점
+│  ├─ skills/{wook-evaluate, wook-plan, wook-brainstorm}/SKILL.md  # 진입점
 │  └─ settings.hooks.json           # 우리가 소유한 hooks 블록({HOOKS_DIR} placeholder)
 ├─ deploy.py                        # claude/ -> ~/.claude 배포 (--check drift시 exit 1)
 ├─ tools/selfcheck.py               # repo 자기검증(컴파일·settings·frontmatter·비밀)
