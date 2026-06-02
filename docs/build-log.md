@@ -51,6 +51,7 @@
 | 2026-06-02 | core-rules 4번째 규칙 추가(신규 구현 요청 시 `/wook-plan` 제안) | 매 프롬프트 주입되는 규칙으로 PGE Plan 단계를 자연 유도 — 게이트 default-ON(레시피 존재=ON)과 맞물림 |
 | 2026-06-02 | `/wook-brainstorm` 신설(PGE 앞단 발산), plan과 별도 스킬로 분리 | plan=수렴(recipe), brainstorm=발산 — 본질이 달라 분리 가치 有. 크기/도메인별 분할은 호출 결정비용만 키워 회피(plan 내부 흡수) |
 | 2026-06-02 | sub-agent를 PGE 너머 *읽기 전용 전문가 풀*로 확장하는 방향 합의 | "쓰기=메인 단일 스레드, 읽기/판정=sub-agent"(§0-3). evaluator가 1번 멤버, brainstorm fan-out이 응용. 대량 신설 대신 필요 시 1개씩(over-build 회피) |
+| 2026-06-02 | #7 게이트 커밋 우회 구멍 메움(`verified_head` 추적) | 턴 안 커밋→stop이 테스트 0회로 통과하던 실제 우회로 차단. SessionStart hook 신설 대신 evaluate_gate.py 자체에서 해결(표면 최소화). 7/7 시나리오 테스트 통과 |
 
 ---
 
@@ -124,8 +125,14 @@
 - **왜 command(스크립트)인가:** 매 턴 발동하니 **싸고 결정론적**이어야. LLM 안 씀. 판정은 실제
   exit code, 실패 시 테스트 출력 그대로 피드백. (깊은 분석은 `/wook-evaluate`의 LLM evaluator)
 - **발동 조건(default-ON by 레시피):** ① **`.claude/evaluate.recipe` 존재**(있으면 게이트 ON,
-  켜는 별도 단계 없음) ② **코드 변경**(git status) ③ `.claude/evaluate-off` 없음. 아니면 즉시 통과
+  켜는 별도 단계 없음) ② **검증할 게 있음**(아래 ②-수정) ③ `.claude/evaluate-off` 없음. 아니면 즉시 통과
   (거의 공짜) → 일반 대화·계획·레시피 없는 repo엔 영향 0. **"켜는 걸 깜빡" 시나리오 제거.**
+- **②-수정(2026-06-02, 커밋 우회 구멍 메움):** 기존엔 *미커밋 코드 변경*(git status)만 봤다 →
+  Claude가 **턴 안에서 커밋부터 하고 멈추면** 워킹트리가 깨끗 → 게이트가 그냥 통과(테스트 0회)하는
+  실제 우회로가 있었다. 수정: 상태에 **마지막으로 통과한 커밋(`verified_head`)**을 기록 → 워킹트리가
+  깨끗해도 **HEAD가 그 커밋에서 움직였으면(=세션 중 커밋됨) 다시 검증**. 미커밋 코드 변경 OR HEAD
+  전진 = 검증. 비-git은 종전대로 항상 검증. 깨끗·미변경(이미 통과한 HEAD)이면 조용히 통과(오발동 0).
+  새 git 프로젝트 첫 stop은 현재 HEAD를 1회 검증 후 기준점으로 기록.
 - **검증 레시피(유동적):** `.claude/evaluate.recipe`에 `name: 셸명령` 선언(어떤 stack/도메인이든) →
   게이트가 전부 실행, 미통과면 블로킹. 게이트는 레시피만 봄(무관 repo 안 건드림); 자동탐지 폴백은
   `/wook-evaluate`(온디맨드) 쪽. 템플릿: `~/.claude/harness/evaluate.recipe.example`
