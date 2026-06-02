@@ -1,6 +1,6 @@
 ---
 name: wook-evaluate
-description: Verify that the current change actually works by running its tests, lint, and build in an independent context — verdict bound to real exit codes, not vibes. Use when asked to "evaluate", "verify this works", "did the tests actually pass", or before claiming a task is done.
+description: Use to confirm a code change actually works before calling a task done. Triggers: "evaluate", "verify this works", "did the tests actually pass", "is it really done"; or about to claim completion of a code change.
 ---
 
 # /wook-evaluate — run the independent Evaluator

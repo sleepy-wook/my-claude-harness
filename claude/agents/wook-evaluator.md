@@ -1,6 +1,6 @@
 ---
 name: wook-evaluator
-description: Independent code Evaluator. Runs the project's tests, lint, and build in an isolated context and returns a verdict bound to REAL exit codes — never to vibes. Use to verify a change actually works before calling it done.
+description: Dispatch to independently verify whether a code change actually works, judged by real command exit codes (tests/lint/build) rather than by reading the code. Use before declaring a change done, or when asked to confirm the tests truly pass.
 tools: Bash, Read, Grep, Glob
 ---
 

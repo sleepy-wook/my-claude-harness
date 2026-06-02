@@ -52,6 +52,8 @@
 | 2026-06-02 | `/wook-brainstorm` 신설(PGE 앞단 발산), plan과 별도 스킬로 분리 | plan=수렴(recipe), brainstorm=발산 — 본질이 달라 분리 가치 有. 크기/도메인별 분할은 호출 결정비용만 키워 회피(plan 내부 흡수) |
 | 2026-06-02 | sub-agent를 PGE 너머 *읽기 전용 전문가 풀*로 확장하는 방향 합의 | "쓰기=메인 단일 스레드, 읽기/판정=sub-agent"(§0-3). evaluator가 1번 멤버, brainstorm fan-out이 응용. 대량 신설 대신 필요 시 1개씩(over-build 회피) |
 | 2026-06-02 | #7 게이트 커밋 우회 구멍 메움(`verified_head` 추적) | 턴 안 커밋→stop이 테스트 0회로 통과하던 실제 우회로 차단. SessionStart hook 신설 대신 evaluate_gate.py 자체에서 해결(표면 최소화). 7/7 시나리오 테스트 통과 |
+| 2026-06-02 | 스킬/에이전트 `description`에 **CSO 규칙** 적용(트리거 조건만, 워크플로 요약 제거) | superpowers 차용. description이 워크플로를 담으면 모델이 본문을 안 읽고 지름길 탐 → 트리거만 남겨 호출 신뢰성↑. 신규 스킬도 이 규칙 따름 |
+| 2026-06-02 | 신규 skill/agent 추가는 보류(빌트인과 중복 회피) | 코드리뷰=`/code-review`·탐색=`Explore`·리서치=`/deep-research`로 이미 커버. 유일 공백은 디버깅 규율 스킬(선택). over-build 회피(core-rules #1) |
 
 ---
 

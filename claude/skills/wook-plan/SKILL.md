@@ -1,6 +1,6 @@
 ---
 name: wook-plan
-description: Turn a short request into a structured spec whose acceptance criteria are EXECUTABLE, then wire them into .claude/evaluate.recipe so the Evaluator (/wook-evaluate) and the auto-gate verify exactly what was agreed. The front of the PGE loop. Use before implementing a medium-or-larger feature or task. Triggers: "plan this", "write a spec", "define acceptance criteria", "what's the plan for".
+description: Use at the START of a non-trivial feature or task, before writing code, to define what "done" means. Triggers: "plan this", "write a spec", "define acceptance criteria", "what's the plan for"; a request to implement a medium-or-larger feature when no spec/recipe exists yet. Not for trivial edits, lookups, or questions.
 ---
 
 # /wook-plan — Planner (define "done" before coding)

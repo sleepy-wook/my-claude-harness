@@ -1,6 +1,6 @@
 ---
 name: wook-brainstorm
-description: Diverge BEFORE committing to a plan — explore options, surface tradeoffs, and widen the solution space when the problem or approach is still open. The step BEFORE the PGE loop. Use when the goal is fuzzy, multiple approaches exist, or you want to think before deciding. Triggers: "brainstorm", "what are my options", "how should I approach", "I'm not sure how to", "explore approaches for". Hands off to /wook-plan once a direction is chosen. Does NOT write code or a recipe.
+description: Use when the problem or approach is still open and options need widening before deciding — earlier than planning. Triggers: "brainstorm", "what are my options", "how should I approach", "I'm not sure how to", "explore approaches for"; the goal is fuzzy or several designs compete. Not when the approach is already decided (use wook-plan) or for trivial edits.
 ---
 
 # /wook-brainstorm — diverge before you plan
