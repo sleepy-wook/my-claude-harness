@@ -48,6 +48,7 @@
 | 2026-06-01 | 커스텀 스킬/에이전트 **`wook-` 접두사**(`/wook-plan`·`/wook-evaluate`·`wook-evaluator`) | 네이티브 plan 모드·플러그인과 충돌/혼동 제거(형욱 닉네임 네임스페이스) |
 | 2026-06-01 | 게이트 **default-ON by 레시피**(opt-in 마커 폐지, off=`.claude/evaluate-off`) | "켜는 걸 깜빡" 제거 — 레시피 존재=ON, `/wook-plan`이 레시피 보장 |
 | 2026-06-01 | **하네스 자기검증**(dogfood): `/wook-plan`으로 `.claude/evaluate.recipe`+`tools/selfcheck.py` 작성 | repo가 자기 무결성 검증. 게이트 통과/차단 둘 다 실증, `deploy --check`는 drift 시 exit 1로 개선 |
+| 2026-06-02 | core-rules 4번째 규칙 추가(신규 구현 요청 시 `/wook-plan` 제안) | 매 프롬프트 주입되는 규칙으로 PGE Plan 단계를 자연 유도 — 게이트 default-ON(레시피 존재=ON)과 맞물림 |
 
 ---
 
@@ -71,10 +72,11 @@
 - **설정:** `settings.json` → `UserPromptSubmit`(matcher 미지원) / exec form / timeout 15
 - **검증:** 파이프 테스트(주석제거·H1제거·본문포함·캡 PASS) → **실 세션 발화 증명**
   (다음 턴 system reminder에 규칙 주입 확인). ✅ live
-- **현재 규칙(시드 3):**
+- **현재 규칙(4개):**
   1. 요청 안 한 변경(대량 파일 생성·비요청 리팩터링·스코프 확장)을 선호하지 않음
   2. 테스트 실제 실행 없이 "완료"라 하는 걸 신뢰 안 함(완료=실행 결과로 증명)
   3. 불확실하면 추측 말고 멈추고 확인받기 선호
+  4. 새 기능/모듈/프로젝트 구현 요청 + `.claude/plan.md` 없으면, 코드 작성 전 `/wook-plan` 호출 제안(단순 수정/탐색/질문 제외) — PGE의 Plan 단계로 자연 유도
 - **편집법:** `core-rules.md` 고치면 다음 프롬프트부터 자동 반영(재시작 불필요).
 
 ### ✅ #3 PreToolUse — 보호 경로 가드(deny)
