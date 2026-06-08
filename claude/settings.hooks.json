@@ -57,6 +57,13 @@
             "args": ["{HOOKS_DIR}/evaluate_gate.py"],
             "timeout": 300,
             "statusMessage": "auto-evaluate gate"
+          },
+          {
+            "type": "command",
+            "command": "python",
+            "args": ["{HOOKS_DIR}/check_reuse_pointers.py"],
+            "timeout": 30,
+            "statusMessage": "reuse pointer check"
           }
         ]
       }
