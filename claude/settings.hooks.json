@@ -37,6 +37,13 @@
             "args": ["{HOOKS_DIR}/inject_core_rules.py"],
             "timeout": 15,
             "statusMessage": "inject core-rules"
+          },
+          {
+            "type": "command",
+            "command": "python",
+            "args": ["{HOOKS_DIR}/inject_reuse_pointer.py"],
+            "timeout": 15,
+            "statusMessage": "reuse pointer"
           }
         ]
       }

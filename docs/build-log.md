@@ -48,6 +48,7 @@
 | 2026-06-01 | 커스텀 스킬/에이전트 **`wook-` 접두사**(`/wook-plan`·`/wook-evaluate`·`wook-evaluator`) | 네이티브 plan 모드·플러그인과 충돌/혼동 제거(형욱 닉네임 네임스페이스) |
 | 2026-06-01 | 게이트 **default-ON by 레시피**(opt-in 마커 폐지, off=`.claude/evaluate-off`) | "켜는 걸 깜빡" 제거 — 레시피 존재=ON, `/wook-plan`이 레시피 보장 |
 | 2026-06-01 | **하네스 자기검증**(dogfood): `/wook-plan`으로 `.claude/evaluate.recipe`+`tools/selfcheck.py` 작성 | repo가 자기 무결성 검증. 게이트 통과/차단 둘 다 실증, `deploy --check`는 drift 시 exit 1로 개선 |
+| 2026-06-09 | #9 재사용 카탈로그: **도메인별 2단계(매니페스트+실제소스), Skill.md 미사용** | Snowflake/Databricks 패턴. 포인터 hook(주입)+`/wook-index`(생성). 실제소스=상세라 안 낡음 |
 
 ---
 
@@ -151,6 +152,25 @@
 
 ---
 
+## 2-C. 재사용 카탈로그 (reuse catalog)
+
+설계: `docs/reuse-catalog-design.md`. AI가 전체 코드 안 읽고 **도메인별 짧은 인덱스**만 보고 기존
+코드 재사용(중복 방지). Snowflake/Databricks "설명목록→관련것만 선택→상세" 패턴, Skill.md 형식엔 안 묶임.
+
+### ✅ #9 재사용 카탈로그 — 포인터 hook + `/wook-index` (live, 검증됨)
+- **구조(2단계):** Tier-1 = `.claude/reuse-index/<domain>.md`(항목당 `이름 · 한줄설명 · path:symbol`),
+  도메인별 분리(프론트 짤 때 백/DB 안 들어옴). Tier-2 = **포인터가 가리키는 실제 소스**(상세 안 낡음).
+- **파일:**
+  - `~/.claude/hooks/inject_reuse_pointer.py` — UserPromptSubmit(2번째 핸들러). `.claude/reuse-index/`
+    있으면 매 턴 **도메인 목록 포인터만** 주입(본문 아님), 없으면 무출력. "파일 존재=ON" 패턴.
+  - `~/.claude/skills/wook-index/SKILL.md` — `/wook-index`: 코드 훑어 도메인별 매니페스트 생성/갱신(semi-auto).
+- **동작:** (매 턴) 포인터로 도메인 인지 → AI가 작업 도메인 매니페스트 1개만 Read → 실제 소스 Read → 재사용.
+- **검증(실제 실행):** 멀티도메인 샘플로 — 포인터 hook(있으면 도메인 주입/없으면 무출력) ✓,
+  매니페스트 **6/6 포인터가 실제 코드로 해석** ✓, **스테일 포인터(없는 심볼) 탐지** ✓, 도메인 분리 ✓.
+- **다음:** standing 지침 최적화(이 워크플로 기본값화) — core-rules vs 전역 CLAUDE.md, 별도.
+
+---
+
 ## 3. 파일 인벤토리 (`~/.claude`)
 
 ```
@@ -160,6 +180,7 @@
 │  ├─ guard_paths.py                  # #3 보호 경로 가드(deny)
 │  ├─ format_py.py                    # #1 자동 포맷
 │  ├─ inject_core_rules.py            # #2 망각 방지 주입
+│  ├─ inject_reuse_pointer.py         # #9 재사용 카탈로그 포인터
 │  └─ evaluate_gate.py                # #7 자동 게이트(Stop hook)
 ├─ harness/
 │  ├─ core-rules.md                   # 주입되는 규칙(편집 대상)
@@ -168,8 +189,9 @@
 ├─ agents/
 │  └─ wook-evaluator.md               # #5 독립 Evaluator 서브에이전트
 └─ skills/
-   ├─ evaluate/SKILL.md               # /wook-evaluate 진입점
-   └─ plan/SKILL.md                   # #8 /wook-plan (Planner)
+   ├─ wook-evaluate/SKILL.md          # /wook-evaluate 진입점
+   ├─ wook-plan/SKILL.md              # #8 /wook-plan (Planner)
+   └─ wook-index/SKILL.md             # #9 /wook-index (재사용 카탈로그 생성)
 ```
 
 ---
