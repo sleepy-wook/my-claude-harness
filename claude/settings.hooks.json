@@ -37,6 +37,13 @@
             "args": ["{HOOKS_DIR}/inject_core_rules.py"],
             "timeout": 15,
             "statusMessage": "inject core-rules"
+          },
+          {
+            "type": "command",
+            "command": "python",
+            "args": ["{HOOKS_DIR}/inject_reuse_pointer.py"],
+            "timeout": 15,
+            "statusMessage": "reuse pointer"
           }
         ]
       }
@@ -50,6 +57,13 @@
             "args": ["{HOOKS_DIR}/evaluate_gate.py"],
             "timeout": 300,
             "statusMessage": "auto-evaluate gate"
+          },
+          {
+            "type": "command",
+            "command": "python",
+            "args": ["{HOOKS_DIR}/check_reuse_pointers.py"],
+            "timeout": 30,
+            "statusMessage": "reuse pointer check"
           }
         ]
       }

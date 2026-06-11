@@ -48,12 +48,14 @@
 | 2026-06-01 | 커스텀 스킬/에이전트 **`wook-` 접두사**(`/wook-plan`·`/wook-evaluate`·`wook-evaluator`) | 네이티브 plan 모드·플러그인과 충돌/혼동 제거(형욱 닉네임 네임스페이스) |
 | 2026-06-01 | 게이트 **default-ON by 레시피**(opt-in 마커 폐지, off=`.claude/evaluate-off`) | "켜는 걸 깜빡" 제거 — 레시피 존재=ON, `/wook-plan`이 레시피 보장 |
 | 2026-06-01 | **하네스 자기검증**(dogfood): `/wook-plan`으로 `.claude/evaluate.recipe`+`tools/selfcheck.py` 작성 | repo가 자기 무결성 검증. 게이트 통과/차단 둘 다 실증, `deploy --check`는 drift 시 exit 1로 개선 |
-| 2026-06-02 | core-rules 4번째 규칙 추가(신규 구현 요청 시 `/wook-plan` 제안) | 매 프롬프트 주입되는 규칙으로 PGE Plan 단계를 자연 유도 — 게이트 default-ON(레시피 존재=ON)과 맞물림 |
+| 2026-06-02 | core-rules 4번째 규칙 추가(신규 구현 요청 시 `/wook-plan` 제안) | 매 프롬프트 주입되는 규칙으로 PGE Plan 단계를 자연 유도 — 게이트 default-ON(레시피 존재=ON)과 맞물림. (이후 merge에서 main '하네스 워크플로' 섹션에 흡수) |
 | 2026-06-02 | `/wook-brainstorm` 신설(PGE 앞단 발산), plan과 별도 스킬로 분리 | plan=수렴(recipe), brainstorm=발산 — 본질이 달라 분리 가치 有. 크기/도메인별 분할은 호출 결정비용만 키워 회피(plan 내부 흡수) |
 | 2026-06-02 | sub-agent를 PGE 너머 *읽기 전용 전문가 풀*로 확장하는 방향 합의 | "쓰기=메인 단일 스레드, 읽기/판정=sub-agent"(§0-3). evaluator가 1번 멤버, brainstorm fan-out이 응용. 대량 신설 대신 필요 시 1개씩(over-build 회피) |
 | 2026-06-02 | #7 게이트 커밋 우회 구멍 메움(`verified_head` 추적) | 턴 안 커밋→stop이 테스트 0회로 통과하던 실제 우회로 차단. SessionStart hook 신설 대신 evaluate_gate.py 자체에서 해결(표면 최소화). 7/7 시나리오 테스트 통과 |
 | 2026-06-02 | 스킬/에이전트 `description`에 **CSO 규칙** 적용(트리거 조건만, 워크플로 요약 제거) | superpowers 차용. description이 워크플로를 담으면 모델이 본문을 안 읽고 지름길 탐 → 트리거만 남겨 호출 신뢰성↑. 신규 스킬도 이 규칙 따름 |
 | 2026-06-02 | 신규 skill/agent 추가는 보류(빌트인과 중복 회피) | 코드리뷰=`/code-review`·탐색=`Explore`·리서치=`/deep-research`로 이미 커버. 유일 공백은 디버깅 규율 스킬(선택). over-build 회피(core-rules #1) |
+| 2026-06-09 | #9 재사용 카탈로그: **도메인별 2단계(매니페스트+실제소스), Skill.md 미사용** | Snowflake/Databricks 패턴. 포인터 hook(주입)+`/wook-index`(생성). 실제소스=상세라 안 낡음 |
+| 2026-06-11 | main(재사용 카탈로그) ← 작업 브랜치 merge | 두 갈래(연구·brainstorm·게이트수정·CSO ↔ 재사용 카탈로그) 통합. core-rules 중복제거(우리 wook-plan 규칙을 main '하네스 워크플로' 섹션에 흡수), Brainstorm 섹션 #9→**#10** 재번호(재사용 카탈로그가 #9) |
 
 ---
 
@@ -77,11 +79,11 @@
 - **설정:** `settings.json` → `UserPromptSubmit`(matcher 미지원) / exec form / timeout 15
 - **검증:** 파이프 테스트(주석제거·H1제거·본문포함·캡 PASS) → **실 세션 발화 증명**
   (다음 턴 system reminder에 규칙 주입 확인). ✅ live
-- **현재 규칙(4개):**
+- **현재 규칙(시드 3 + 「하네스 워크플로(기본값)」 섹션):**
   1. 요청 안 한 변경(대량 파일 생성·비요청 리팩터링·스코프 확장)을 선호하지 않음
   2. 테스트 실제 실행 없이 "완료"라 하는 걸 신뢰 안 함(완료=실행 결과로 증명)
   3. 불확실하면 추측 말고 멈추고 확인받기 선호
-  4. 새 기능/모듈/프로젝트 구현 요청 + `.claude/plan.md` 없으면, 코드 작성 전 `/wook-plan` 호출 제안(단순 수정/탐색/질문 제외) — PGE의 Plan 단계로 자연 유도
+  - **하네스 워크플로(기본값)** 섹션 3줄: ① 중간+ 구현은 `/wook-plan`으로 시작(`.claude/plan.md` 없으면 코드 전 제안, 단순 수정/탐색/질문 제외) ② 새 코드 전 재사용 카탈로그(`.claude/reuse-index/`) 확인 ③ 새 재사용물 만들면 도메인 매니페스트에 한 줄 추가 (구 "규칙 4"는 merge 때 ①에 흡수)
 - **편집법:** `core-rules.md` 고치면 다음 프롬프트부터 자동 반영(재시작 불필요).
 
 ### ✅ #3 PreToolUse — 보호 경로 가드(deny)
@@ -162,7 +164,7 @@
 - **검증:** 배포·frontmatter 유효 확인. (스킬=프롬프트라 exit code 테스트 불가; 동작은 호출 시 발현)
 - **활성화:** 다음 재시작부터 `/wook-plan` 호출 가능(스킬 목록 갱신 시 등록).
 
-### ✅ #9 Brainstorm — `/wook-brainstorm` (PGE 앞단 발산)
+### ✅ #10 Brainstorm — `/wook-brainstorm` (PGE 앞단 발산)
 - **목적:** plan이 *수렴*(수용기준→recipe)이라면, brainstorm은 *발산* — 문제/접근이 아직
   열린 단계에서 **옵션을 넓히고 트레이드오프를 드러낸다.** 코드·recipe 둘 다 만들지 않음
   (성급한 recipe = 틀린 기준 고착). 방향이 잡히면 `/wook-plan`으로 핸드오프.
@@ -179,6 +181,31 @@
 
 ---
 
+## 2-C. 재사용 카탈로그 (reuse catalog)
+
+설계: `docs/reuse-catalog-design.md`. AI가 전체 코드 안 읽고 **도메인별 짧은 인덱스**만 보고 기존
+코드 재사용(중복 방지). Snowflake/Databricks "설명목록→관련것만 선택→상세" 패턴, Skill.md 형식엔 안 묶임.
+
+### ✅ #9 재사용 카탈로그 — 포인터 hook + `/wook-index` (live, 검증됨)
+- **구조(2단계):** Tier-1 = `.claude/reuse-index/<domain>.md`(항목당 `이름 · 한줄설명 · path:symbol`),
+  도메인별 분리(프론트 짤 때 백/DB 안 들어옴). Tier-2 = **포인터가 가리키는 실제 소스**(상세 안 낡음).
+- **파일:**
+  - `~/.claude/hooks/inject_reuse_pointer.py` — UserPromptSubmit(2번째 핸들러). `.claude/reuse-index/`
+    있으면 매 턴 **도메인 목록 포인터만** 주입(본문 아님), 없으면 무출력. "파일 존재=ON" 패턴.
+  - `~/.claude/skills/wook-index/SKILL.md` — `/wook-index`: 코드 훑어 도메인별 매니페스트 생성/갱신(semi-auto).
+- **동작:** (매 턴) 포인터로 도메인 인지 → AI가 작업 도메인 매니페스트 1개만 Read → 실제 소스 Read → 재사용.
+- **검증(실제 실행):** 멀티도메인 샘플로 — 포인터 hook(있으면 도메인 주입/없으면 무출력) ✓,
+  매니페스트 **6/6 포인터가 실제 코드로 해석** ✓, **스테일 포인터(없는 심볼) 탐지** ✓, 도메인 분리 ✓.
+- **기본값화(완료):** `core-rules.md`에 "하네스 워크플로(기본값)" 추가 — 중간+ 구현은
+  `/wook-plan`으로 시작, 새 코드 전 재사용 카탈로그 확인, **새 재사용물 만들면 카탈로그에 추가**.
+  매 턴 주입 검증됨. 전역 CLAUDE.md는 중복이라 안 만듦(hook이 게이트·재사용은 이미 자동 강제).
+- **카탈로그 유지보수 분담:** *추가*(판단+설명 필요)는 AI 기본값(core-rules), *스테일 탐지*(삭제된
+  심볼=결정론)는 hook. `check_reuse_pointers.py`(Stop, 비차단): reuse-index 있고 코드 변경 시
+  매니페스트 포인터 해석 검사 → 스테일이면 "/wook-index로 갱신" **알림만**(완료 안 막음).
+  검증: 정상→무알림, 스테일(없는 심볼)→알림, reuse-index 없으면 무알림. ✅
+
+---
+
 ## 3. 파일 인벤토리 (`~/.claude`)
 
 ```
@@ -188,7 +215,9 @@
 │  ├─ guard_paths.py                  # #3 보호 경로 가드(deny)
 │  ├─ format_py.py                    # #1 자동 포맷
 │  ├─ inject_core_rules.py            # #2 망각 방지 주입
-│  └─ evaluate_gate.py                # #7 자동 게이트(Stop hook)
+│  ├─ inject_reuse_pointer.py         # #9 재사용 카탈로그 포인터
+│  ├─ evaluate_gate.py                # #7 자동 게이트(Stop hook)
+│  └─ check_reuse_pointers.py         # #9 스테일 포인터 알림(Stop hook, 비차단)
 ├─ harness/
 │  ├─ core-rules.md                   # 주입되는 규칙(편집 대상)
 │  ├─ core-rules.README.md            # 규칙 작성 가이드
@@ -198,7 +227,8 @@
 └─ skills/
    ├─ wook-evaluate/SKILL.md          # /wook-evaluate 진입점
    ├─ wook-plan/SKILL.md              # #8 /wook-plan (Planner)
-   └─ wook-brainstorm/SKILL.md        # #9 /wook-brainstorm (발산, PGE 앞단)
+   ├─ wook-brainstorm/SKILL.md        # #10 /wook-brainstorm (발산, PGE 앞단)
+   └─ wook-index/SKILL.md             # #9 /wook-index (재사용 카탈로그 생성)
 ```
 
 ---
@@ -215,10 +245,10 @@ my-claude-harness/                  # git repo (비밀 0, 단순 blacklist .giti
 ├─ CLAUDE.md                        # 이 repo 작업 시 컨벤션(build-log 갱신 등)
 ├─ docs/{claude-harness-design, build-log}.md
 ├─ claude/                          # ~/.claude 산출물의 source of truth
-│  ├─ hooks/{guard_paths, format_py, inject_core_rules, evaluate_gate}.py
+│  ├─ hooks/{guard_paths, format_py, inject_core_rules, inject_reuse_pointer, evaluate_gate, check_reuse_pointers}.py
 │  ├─ harness/{core-rules.md, core-rules.README.md, evaluate.recipe.example}
 │  ├─ agents/wook-evaluator.md       # #5 Evaluator 서브에이전트
-│  ├─ skills/{wook-evaluate, wook-plan, wook-brainstorm}/SKILL.md  # 진입점
+│  ├─ skills/{wook-evaluate, wook-plan, wook-brainstorm, wook-index}/SKILL.md  # 진입점
 │  └─ settings.hooks.json           # 우리가 소유한 hooks 블록({HOOKS_DIR} placeholder)
 ├─ deploy.py                        # claude/ -> ~/.claude 배포 (--check drift시 exit 1)
 ├─ tools/selfcheck.py               # repo 자기검증(컴파일·settings·frontmatter·비밀)
