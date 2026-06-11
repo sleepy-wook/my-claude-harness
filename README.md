@@ -49,6 +49,8 @@ python deploy.py --target=codex     # ~/.codex 로: hooks.json·skills/·AGENTS.
 ```
 - hook **스크립트는 공유**(stdin JSON 스키마 동일). 다른 건 등록 파일(settings.json↔`hooks.json`)·규칙 파일
   (core-rules↔`AGENTS.md`)·평가자 래퍼(`.md`↔`.toml`)뿐 — 어댑터가 얇다.
+- **프로젝트 아티팩트도 도구별**: Claude는 프로젝트 `.claude/`, Codex는 `.codex/`(conventions·reuse-index·
+  project-map·recipe). deploy가 `.claude`→`.codex`로 치환해 배포하므로 Codex 프로젝트엔 `.codex/`만 생긴다.
 - ⚠️ **정직한 한계:** Codex `apply_patch` 편집 hook 발동·정확한 스키마는 **설치된 Codex 버전에서 경험적
   확인** 필요(hooks는 v0.124.0+). 자동포맷·보호경로 deny가 여기 달림.
 

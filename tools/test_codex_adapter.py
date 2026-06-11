@@ -69,6 +69,29 @@ agents = deploy.build_agents_md(
 check("dropped source H1 (# core-rules)", "# core-rules" not in agents)
 check("carries a known rule phrase", "테스트·검증" in agents)
 
+print("Test — Codex dir rename (.claude → .codex)")
+check(
+    "codex_text renames project dir",
+    deploy.codex_text(".claude/conventions") == ".codex/conventions",
+)
+check(
+    "codex_text renames home dir",
+    ".codex" in deploy.codex_text('home() / ".claude" / "cache"'),
+)
+_src = (REPO / "claude" / "hooks" / "inject_convention_pointer.py").read_text(
+    encoding="utf-8"
+)
+_rendered = deploy.codex_text(_src)
+check(
+    "rendered hook reads .codex, not .claude",
+    ".codex/conventions" in _rendered and ".claude" not in _rendered,
+)
+_agents_codex = deploy.codex_text(agents)
+check(
+    "Codex AGENTS.md points at .codex, not .claude",
+    ".codex/" in _agents_codex and ".claude/" not in _agents_codex,
+)
+
 print("Test — evaluator.toml")
 ev = deploy.build_evaluator_toml(
     (REPO / "claude" / "agents" / "wook-evaluator.md").read_text(encoding="utf-8")

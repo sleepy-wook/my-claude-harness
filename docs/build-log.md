@@ -76,6 +76,8 @@
 | 2026-06-11 | 스킬 전수 **독립 감사**(타 에이전트) → 트리거 충돌·CSO 정리 | 죽은/중복 스킬 0(자를것·합칠것 없음). 단 `"onboard this repo"`가 map/conventions/onboard 3곳에 걸린 충돌 발견 → map·conventions·index에서 온보딩 트리거 제거(onboard가 유일 front door), plan/index/map description CSO 정리 |
 | 2026-06-11 | build-log 무한성장 대책 = **계층화(C)** | 리서치 3각도 수렴: ADR supersede(status) + MemGPT식 아카이브(cold 이동, 삭제 X) + progressive disclosure(인덱스/최근만 읽기) + selfcheck 임계 트리거. B(풀 ADR 분할)는 우리 *서술+결정+스냅샷* 혼합엔 맥락 흩어지고 과설계 → C 채택 |
 | 2026-06-11 | #15 멀티에이전트 = **deploy --target(v1)**, 디렉터리 재구조(v2) 보류 | 리서치: Codex가 hooks/skills/MCP를 Claude와 거의 동일 스키마로 미러 → 어댑터 얇음. 한 소스 읽어 도구별 렌더(스크립트 공유). v2 core/adapters 재구조는 cosmetic+위험↑라 보류. Codex 실동작은 머신 검증(컨테이너 불가) |
+| 2026-06-11 | Codex 지식파일 = **`.codex/`**(deploy가 `.claude`→`.codex` 치환) | 초기 decision A('`.claude` 공유') → **폐기**. Codex 프로젝트에 `.claude/`가 생기는 건 틀림(형욱 지적). 모든 codex 배포 텍스트에 `.claude`→`.codex` 적용, 배포본에 `.claude` 0 확인 |
+| 2026-06-11 | Windows(cp949) UnicodeDecodeError 수정 + selfcheck encoding 가드 | `read_text/write_text`가 로케일 기본 인코딩 써서 UTF-8 한글 소스 못 읽고 죽음. 모든 텍스트 I/O에 `encoding="utf-8"`, 가드가 누락 정적 차단(가드가 실제 1건 추가 적발) |
 
 ---
 
@@ -338,7 +340,8 @@ LLM 평가자(서브에이전트)만 가능(결정론 셸 게이트는 브라우
   - `AGENTS.md` ← core-rules(항상 로드=망각방지 등가). `agents/wook-evaluator.toml` ← 평가자(.md→.toml, sandbox read-only + Playwright MCP)
   - hooks/skills/harness는 그대로 복사(SKILL.md 컨벤션 동일).
 - **필드명 관용:** hook 스크립트가 `tool_input.file_path`(Claude)·`path`(Codex) 둘 다 읽음(guard_paths·format_py).
-- **결정(승인):** A 지식파일 `.claude/` 유지 · B core-rules→AGENTS.md · C 평가자=custom agent `.toml` · v1=deploy --target(재구조 X, v2 보류).
+- **결정(승인):** A **지식파일 도구별**(`.claude`↔`.codex`, deploy가 `.claude`→`.codex` 치환) · B core-rules→AGENTS.md · C 평가자=custom agent `.toml` · v1=deploy --target(재구조 X, v2 보류). *(초기 'A: `.claude` 공유'는 오류 — Codex 프로젝트에 `.claude/`가 생기는 건 틀림. 형욱 지적으로 정정.)*
+- **`.claude`→`.codex` 치환:** codex 배포 시 복사/렌더되는 모든 텍스트에 적용 — hook 스크립트(프로젝트 `.codex/conventions`·글로벌 `~/.codex/cache`)·skills·AGENTS.md·evaluator.toml. `.claude`(점)는 우리 파일에서 항상 디렉터리라 안전(제품명 "Claude Code"는 점 없음). 검증: 배포된 `~/.codex`에 `.claude` 흔적 0.
 - **검증(`tools/test_codex_adapter.py` 12/12):** 변환 hooks.json 유효·4이벤트·apply_patch·스크립트 보존,
   AGENTS.md H1제거+규칙, evaluator.toml tomllib 파싱, 필드 관용(file_path/path). 회귀 6/6·6/6·11/11, selfcheck exit 0.
   실제 렌더 확인(~/.codex/{hooks.json,AGENTS.md,agents/wook-evaluator.toml}).
