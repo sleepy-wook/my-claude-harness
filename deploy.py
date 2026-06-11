@@ -147,7 +147,9 @@ def deploy_claude(check: bool) -> list:
         if settings_path.exists()
         else {}
     )
-    new_hooks = build_hooks_block((SRC / "settings.hooks.json").read_text(), hooks_dir)
+    new_hooks = build_hooks_block(
+        (SRC / "settings.hooks.json").read_text(encoding="utf-8"), hooks_dir
+    )
     same = settings.get("hooks") == new_hooks
     actions.append(("settings", "hooks key", "up-to-date" if same else "update"))
     if not check and not same:
@@ -170,7 +172,7 @@ def deploy_codex(check: bool) -> list:
         dest / "hooks.json",
         json.dumps(
             build_codex_hooks_json(
-                (SRC / "settings.hooks.json").read_text(), hooks_dir
+                (SRC / "settings.hooks.json").read_text(encoding="utf-8"), hooks_dir
             ),
             indent=2,
         )
@@ -181,14 +183,18 @@ def deploy_codex(check: bool) -> list:
     )
     write_rendered(
         dest / "AGENTS.md",
-        build_agents_md((SRC / "harness" / "core-rules.md").read_text()),
+        build_agents_md(
+            (SRC / "harness" / "core-rules.md").read_text(encoding="utf-8")
+        ),
         "AGENTS.md",
         check,
         actions,
     )
     write_rendered(
         dest / "agents" / "wook-evaluator.toml",
-        build_evaluator_toml((SRC / "agents" / "wook-evaluator.md").read_text()),
+        build_evaluator_toml(
+            (SRC / "agents" / "wook-evaluator.md").read_text(encoding="utf-8")
+        ),
         "agents/wook-evaluator.toml",
         check,
         actions,

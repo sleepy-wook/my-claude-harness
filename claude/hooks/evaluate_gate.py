@@ -181,7 +181,7 @@ def state_path(root: Path) -> Path:
 
 def read_state(root: Path) -> dict:
     try:
-        st = json.loads(state_path(root).read_text())
+        st = json.loads(state_path(root).read_text(encoding="utf-8"))
         st.setdefault("verified_head", None)
         return st
     except Exception:
@@ -191,7 +191,7 @@ def read_state(root: Path) -> dict:
 def write_state(root: Path, st: dict) -> None:
     try:
         STATE_DIR.mkdir(parents=True, exist_ok=True)
-        state_path(root).write_text(json.dumps(st))
+        state_path(root).write_text(json.dumps(st), encoding="utf-8")
     except Exception:
         pass
 
@@ -199,7 +199,9 @@ def write_state(root: Path, st: dict) -> None:
 def reset_episode(root: Path, verified_head: str | None) -> None:
     """Clear the retry/stuck counters for a new episode, but KEEP verified_head
     (which records the last commit that passed, so it must survive across episodes)."""
-    write_state(root, {"attempts": 0, "sig": None, "stuck": 0, "verified_head": verified_head})
+    write_state(
+        root, {"attempts": 0, "sig": None, "stuck": 0, "verified_head": verified_head}
+    )
 
 
 # ---- main ------------------------------------------------------------------
@@ -266,7 +268,13 @@ def main() -> int:
         )
 
     write_state(
-        root, {"attempts": attempts, "sig": sig, "stuck": stuck, "verified_head": verified_head}
+        root,
+        {
+            "attempts": attempts,
+            "sig": sig,
+            "stuck": stuck,
+            "verified_head": verified_head,
+        },
     )
     progress = "same failure" if stuck > 1 else "new failure"
     return block(

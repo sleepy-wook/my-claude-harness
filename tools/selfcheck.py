@@ -71,6 +71,30 @@ try:
 except Exception as e:
     errors.append(f"secrets: {e}")
 
+
+# 4b. Cross-platform: deployed/runtime scripts must pin text encoding.
+#     Windows defaults to cp949; reading our UTF-8 (Korean) sources without
+#     encoding="utf-8" crashes there. Enforce it on everything we deploy/run.
+def _io_missing_encoding(src: str) -> bool:
+    """True if any read_text/write_text call omits encoding= (balanced-paren scan,
+    so multi-line calls and nested parens like write_text(json.dumps(x), ...) are ok)."""
+    for m in re.finditer(r"\.(?:read_text|write_text)\(", src):
+        depth, j = 1, m.end()
+        while j < len(src) and depth:
+            depth += {"(": 1, ")": -1}.get(src[j], 0)
+            j += 1
+        if "encoding" not in src[m.end() : j]:
+            return True
+    return False
+
+
+for s in scripts:
+    if _io_missing_encoding(Path(s).read_text(encoding="utf-8")):
+        errors.append(
+            f"encoding: {os.path.relpath(s, REPO)} — a read_text/write_text lacks "
+            "encoding= (breaks on Windows cp949)"
+        )
+
 # 5. build-log growth nudge (non-failing): tiered-log policy says archive when large.
 warnings: list[str] = []
 try:

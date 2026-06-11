@@ -64,14 +64,14 @@ check(
 
 print("Test — AGENTS.md from core-rules")
 agents = deploy.build_agents_md(
-    (REPO / "claude" / "harness" / "core-rules.md").read_text()
+    (REPO / "claude" / "harness" / "core-rules.md").read_text(encoding="utf-8")
 )
 check("dropped source H1 (# core-rules)", "# core-rules" not in agents)
 check("carries a known rule phrase", "테스트·검증" in agents)
 
 print("Test — evaluator.toml")
 ev = deploy.build_evaluator_toml(
-    (REPO / "claude" / "agents" / "wook-evaluator.md").read_text()
+    (REPO / "claude" / "agents" / "wook-evaluator.md").read_text(encoding="utf-8")
 )
 try:
     import tomllib
