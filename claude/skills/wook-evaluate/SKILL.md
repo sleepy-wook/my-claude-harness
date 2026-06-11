@@ -19,8 +19,9 @@ Evaluator has run its tests/lint/build and seen them pass.** It exists to kill t
    the point; the context that wrote the code must not grade itself). Use the Agent tool:
    - `subagent_type: "wook-evaluator"`
    - prompt: state the scope and the working directory, e.g.
-     "Evaluate the change to <scope> in <cwd>. Run the project's tests, lint, and build
-     and return your verdict."
+     "Evaluate the change to <scope> in <cwd>. Run the project's checks AND exercise it the
+     domain-appropriate way (UI → Playwright MCP, API → call endpoints, db → query), then
+     return your verdict."
 
 3. **Relay the verdict honestly.** Show the Evaluator's `VERDICT` line and its gate
    results to the user verbatim — do not soften FAIL/INCONCLUSIVE into PASS.

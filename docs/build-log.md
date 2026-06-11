@@ -59,6 +59,8 @@
 | 2026-06-11 | #11 컨벤션 시스템(도메인별 코딩 규칙/스타일) — 재사용 카탈로그의 형제 | 프로젝트별 `.claude/conventions/<domain>.md`, 값은 소스 포인터(안 낡음). 형제 hook 2개(포인터 주입+스테일 검사) — main `check_reuse_pointers` 안 건드림. 게이트 강제는 기존 Stop 게이트 재사용. frontend 슬라이스부터(over-build 회피). test_conventions 6/6 PASS |
 | 2026-06-11 | `/wook-conventions` = **bimodal**(greenfield 확정 / brownfield 추출) | 빈 프로젝트는 코딩 전 확정, 진행된 프로젝트는 도메인 코드만 훑어 초안+불일치 플래그 |
 | 2026-06-11 | `/wook-conventions` 안내를 **도메인 중립으로 일반화** | 기계장치는 처음부터 도메인 무관이나 스킬 *예시*가 frontend 편향 → "도메인별 무엇을 담는지" 힌트표(front/back/db/infra/data/shared)로 교체, greenfield/brownfield·문서예시 다도메인화. `.frontend.example`은 예시 1개로 유지 |
+| 2026-06-11 | #12 독립 평가자: **Playwright MCP + 도메인별 실제 평가 + 망각 제거 리마인더** | 본인 자기평가 ❌·딴 평가자가 화면 직접 봄. MCP는 LLM 평가자 층에만(셸 게이트는 브라우저 못 굴림). 평가자 allowlist에 `mcp__playwright__*`(빌트인 브라우저 배제), Iron law를 관찰사실까지 확장 |
+| 2026-06-11 | 평가자 호출 트리거 = **본인 판단 + 결정론 리마인더**(강제 차단 X) | "사소 vs 비사소"는 기계 판단 부적합(1줄도 클 수 있음) → 본인 판단. 단 "큰 변경에도 까먹음" 해결 위해 코드변경 턴에 비차단 알림. frontend 슬라이스부터(over-build 회피) |
 
 ---
 
@@ -240,6 +242,32 @@
 
 ---
 
+## 2-E. 독립 평가자 — 도메인별 실제 평가 (Playwright MCP)
+
+문제: **본인이 자기 코드 평가 ❌**, 딴 평가자가 객관 평가해야 하는데 — 화면을 볼 수 있는 평가는
+LLM 평가자(서브에이전트)만 가능(결정론 셸 게이트는 브라우저 못 굴림). 게다가 그 평가자는 *본인이
+부를지 선택*이라 큰 변경에도 자주 까먹음. → "도메인 맞는 실제 평가 + 망각 제거".
+
+### ✅ #12 독립 평가자 강화 — Playwright MCP + 도메인별 평가 + 리마인더 (frontend 슬라이스)
+- **도구:** `wook-evaluator` allowlist에 `mcp__playwright__*` 추가, **빌트인 브라우저/WebFetch 제외**
+  (MCP만 강제). Edit/Write 제외 유지. (서브에이전트 `tools:` allowlist·MCP 와일드카드 문법은
+  `claude-code-guide`로 공식 확인 — 추측 안 함.)
+- **평가자 지시:** Iron law를 "exit 0 **또는 실제 관찰 사실**(렌더된 텍스트·응답 바디·콘솔 0에러)"로
+  확장 + **"도메인별 평가 방식"** 절(frontend=Playwright MCP 화면검증, backend=엔드포인트 호출,
+  db=쿼리, data=파이프라인, infra=plan). 도구/앱/MCP 없으면 **INCONCLUSIVE**(거짓 PASS 금지).
+- **망각 제거:** `~/.claude/hooks/remind_evaluator.py`(Stop, 비차단) — `.claude` 있는 프로젝트에서
+  코드 변경 턴이면 "사소하지 않으면 독립 평가자 호출" 알림(프론트 변경=Playwright 힌트).
+  **사소 판단은 본인 몫**(기계 강제 X), 시스템은 망각만 막음.
+- **표준 규칙:** core-rules에 "비사소 변경 → 본인이 평가 말고 독립 평가자, 도메인 맞는 검증" 1줄.
+- **두 층 상보:** 결정론 게이트(셸 green=바닥) + 독립 평가자(도메인 맞는 실제 검증=깊이). MCP는
+  LLM 평가자 층에만(게이트는 셸 유지).
+- **검증(`tools/test_evaluator.py` 6/6 PASS):** 리마인더(프론트→알림+Playwright / 백→알림 /
+  변경없음·`.claude`없음→무출력), 평가자 tools에 Playwright MCP 있고 Edit/Write/WebFetch 없음.
+  selfcheck exit 0(10 scripts). **한계: 실제 Playwright 화면검증은 MCP·브라우저·앱 필요 → 배포 후 라이브 시험으로만 검증(정직히 표시).**
+- **OUT:** backend/db/infra 실제 평가 자동화, Playwright MCP 서버 설치(프로젝트 책임), 강제 차단(지금은 넛지만).
+
+---
+
 ## 3. 파일 인벤토리 (`~/.claude`)
 
 ```
@@ -253,7 +281,8 @@
 │  ├─ inject_convention_pointer.py    # #11 컨벤션 포인터
 │  ├─ evaluate_gate.py                # #7 자동 게이트(Stop hook)
 │  ├─ check_reuse_pointers.py         # #9 스테일 포인터 알림(Stop hook, 비차단)
-│  └─ check_convention_pointers.py    # #11 컨벤션 스테일 알림(Stop hook, 비차단)
+│  ├─ check_convention_pointers.py    # #11 컨벤션 스테일 알림(Stop hook, 비차단)
+│  └─ remind_evaluator.py             # #12 독립 평가자 리마인더(Stop hook, 비차단)
 ├─ harness/
 │  ├─ core-rules.md                   # 주입되는 규칙(편집 대상)
 │  ├─ core-rules.README.md            # 규칙 작성 가이드
@@ -283,13 +312,13 @@ my-claude-harness/                  # git repo (비밀 0, 단순 blacklist .giti
 ├─ CLAUDE.md                        # 이 repo 작업 시 컨벤션(build-log 갱신 등)
 ├─ docs/{claude-harness-design, build-log}.md
 ├─ claude/                          # ~/.claude 산출물의 source of truth
-│  ├─ hooks/{guard_paths, format_py, inject_core_rules, inject_reuse_pointer, inject_convention_pointer, evaluate_gate, check_reuse_pointers, check_convention_pointers}.py
+│  ├─ hooks/{guard_paths, format_py, inject_core_rules, inject_reuse_pointer, inject_convention_pointer, evaluate_gate, check_reuse_pointers, check_convention_pointers, remind_evaluator}.py
 │  ├─ harness/{core-rules.md, core-rules.README.md, evaluate.recipe.example, conventions.frontend.example}
 │  ├─ agents/wook-evaluator.md       # #5 Evaluator 서브에이전트
 │  ├─ skills/{wook-evaluate, wook-plan, wook-brainstorm, wook-index, wook-conventions}/SKILL.md  # 진입점
 │  └─ settings.hooks.json           # 우리가 소유한 hooks 블록({HOOKS_DIR} placeholder)
 ├─ deploy.py                        # claude/ -> ~/.claude 배포 (--check drift시 exit 1)
-├─ tools/{selfcheck.py, test_conventions.py}  # 자기검증 + 컨벤션 행동 테스트(#11)
+├─ tools/{selfcheck.py, test_conventions.py, test_evaluator.py}  # 자기검증 + #11·#12 행동 테스트
 ├─ .claude/{evaluate.recipe, plan.md}  # 이 repo 자신의 게이트 설정(자기검증 ON)
 └─ .gitignore
 ```

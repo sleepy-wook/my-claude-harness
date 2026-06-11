@@ -72,3 +72,36 @@ deploy:    python deploy.py --check
 - `claude/hooks/{inject_convention_pointer, check_convention_pointers}.py`
 - `claude/skills/wook-conventions/SKILL.md`, `claude/harness/conventions.frontend.example`
 - `tools/test_conventions.py`
+
+---
+
+# SPEC — 독립 평가자: 도메인별 실제 평가 + Playwright MCP (frontend 슬라이스)
+
+> 2026-06-11 승인. 코드 쓴 본인이 자기 평가 ❌ → 독립 `wook-evaluator`가 도메인에 맞는 방식으로
+> *실제로 굴려* 평가(단순 green ❌). 프론트=Playwright MCP로 화면 직접 봄. 사소 변경은 본인이 판단해 제외.
+
+## 문제
+- 화면을 볼 수 있는 평가는 LLM 평가자(서브에이전트)만 가능(결정론 셸 게이트는 브라우저 못 굴림).
+- 그 평가자는 *본인이 부를지 선택*이라 큰 변경에도 자주 까먹음 → 독립·객관 평가가 빠짐.
+
+## Scope — IN (frontend 슬라이스)
+1. `wook-evaluator` 도구 허용목록에 `mcp__playwright__*` 추가 + 빌트인 브라우저/WebFetch 제외
+   (allowlist라 안 적으면 빠짐 — claude-code-guide로 문법 확인됨). Edit/Write 제외 유지.
+2. 평가자 지시: Iron law를 "exit 0 **또는** 실제 관찰 사실"로 확장 + "도메인별 평가 방식"
+   절(frontend=Playwright MCP 화면검증, backend=엔드포인트, db=쿼리, …) + 도구/앱 없으면 INCONCLUSIVE.
+3. `remind_evaluator.py` (Stop, 비차단): 코드 변경 턴이면 "사소하지 않으면 독립 평가자 호출" 알림
+   (프론트 변경이면 Playwright 힌트). **본인이 사소 판단**, 시스템은 망각만 제거.
+4. core-rules 표준 규칙 1줄(비사소 변경 → 독립 평가자, 도메인 맞는 검증).
+
+## Scope — OUT
+- backend/db/infra 실제 평가 자동화, Playwright MCP 서버 설치(프로젝트 책임), 강제 차단(넛지만).
+
+## Acceptance criteria (`tools/test_evaluator.py` + selfcheck)
+1. `selfcheck` exit 0(remind hook 컴파일 + 평가자 frontmatter 유효).
+2. remind hook: 프론트 변경→알림+Playwright 힌트 / 백엔드 변경→알림(Playwright 없음) /
+   코드변경 없음·`.claude` 없음→무출력.
+3. 평가자 tools에 `mcp__playwright__*` 있고 Edit/Write/WebFetch 없음.
+- **한계(정직):** 평가자가 실제 Playwright로 화면 보는 동작은 MCP·브라우저·앱 필요 → **배포 후 라이브 시험**으로만 검증.
+
+## 산출물(추가)
+- `claude/hooks/remind_evaluator.py`, `claude/agents/wook-evaluator.md`(수정), `tools/test_evaluator.py`
