@@ -4,6 +4,7 @@
 Self-contained: builds throwaway projects and pipes hook events to the real scripts.
 Run from the repo root. Exit 0 = all pass.
 """
+
 import json
 import shutil
 import subprocess
@@ -30,8 +31,9 @@ def run(script, cwd, extra=None):
     ev = {"cwd": cwd}
     if extra:
         ev.update(extra)
-    p = subprocess.run([sys.executable, script], input=json.dumps(ev),
-                       capture_output=True, text=True)
+    p = subprocess.run(
+        [sys.executable, script], input=json.dumps(ev), capture_output=True, text=True
+    )
     return p.returncode, p.stdout.strip()
 
 
@@ -54,40 +56,59 @@ def gate_decision(d):
 print("Test 2 — pointer inject hook")
 d = tempfile.mkdtemp(prefix="conv_")
 c = conv_dir(d)
-(c / "frontend.md").write_text("# f\n- primary · x · src/theme.ts:primary\n")
+(c / "frontend.md").write_text(
+    "# f\n- primary · x · src/theme.ts:primary\n", encoding="utf-8"
+)
 (c / "shared.md").write_text("# shared\n")
 rc, out = run(INJECT, d)
-check("2a present: exit 0 + mentions shared + frontend",
-      rc == 0 and "shared.md" in out and "frontend" in out and "additionalContext" in out, True)
-d2 = tempfile.mkdtemp(prefix="conv_")   # no conventions dir
+check(
+    "2a present: exit 0 + mentions shared + frontend",
+    rc == 0 and "shared.md" in out and "frontend" in out and "additionalContext" in out,
+    True,
+)
+d2 = tempfile.mkdtemp(prefix="conv_")  # no conventions dir
 rc, out = run(INJECT, d2)
 check("2b absent: exit 0 + no output", rc == 0 and out == "", True)
 
 print("Test 3 — stale pointer check hook (needs git + code change)")
 d = tempfile.mkdtemp(prefix="conv_")
 subprocess.run("git init -q", cwd=d, shell=True, check=True)
-(Path(d) / "app.py").write_text("def good_fn():\n    return 1\n")   # untracked code change
+(Path(d) / "app.py").write_text(
+    "def good_fn():\n    return 1\n"
+)  # untracked code change
 c = conv_dir(d)
 (c / "frontend.md").write_text(
-    "# f\n- good · ok · app.py:good_fn\n- bad · gone · app.py:missing_fn\n")
+    "# f\n- good · ok · app.py:good_fn\n- bad · gone · app.py:missing_fn\n",
+    encoding="utf-8",
+)
 rc, out = run(CHECK, d)
-check("3a stale flagged: names missing, not good", "missing_fn" in out and "good_fn" not in out, True)
-(c / "frontend.md").write_text("# f\n- good · ok · app.py:good_fn\n")   # drop stale line
+check(
+    "3a stale flagged: names missing, not good",
+    "missing_fn" in out and "good_fn" not in out,
+    True,
+)
+(c / "frontend.md").write_text(  # drop stale line
+    "# f\n- good · ok · app.py:good_fn\n", encoding="utf-8"
+)
 rc, out = run(CHECK, d)
 check("3b all valid: no output", out == "", True)
 
 print("Test 4 — convention rule enforced by the gate")
 if STATE_DIR.exists():
     shutil.rmtree(STATE_DIR)
-d = tempfile.mkdtemp(prefix="conv_")   # non-git: gate always evaluates
+d = tempfile.mkdtemp(prefix="conv_")  # non-git: gate always evaluates
 (Path(d) / ".claude").mkdir()
-(Path(d) / ".claude" / "evaluate.recipe").write_text("style: ! grep -q RAWHEX app.tsx\n")
-(Path(d) / "app.tsx").write_text("const c = 'RAWHEX';\n")   # violation
+(Path(d) / ".claude" / "evaluate.recipe").write_text(
+    "style: ! grep -q RAWHEX app.tsx\n"
+)
+(Path(d) / "app.tsx").write_text("const c = 'RAWHEX';\n")  # violation
 check("4a violation -> block", gate_decision(d), "block")
 d = tempfile.mkdtemp(prefix="conv_")
 (Path(d) / ".claude").mkdir()
-(Path(d) / ".claude" / "evaluate.recipe").write_text("style: ! grep -q RAWHEX app.tsx\n")
-(Path(d) / "app.tsx").write_text("const c = tokens.primary;\n")   # compliant
+(Path(d) / ".claude" / "evaluate.recipe").write_text(
+    "style: ! grep -q RAWHEX app.tsx\n"
+)
+(Path(d) / "app.tsx").write_text("const c = tokens.primary;\n")  # compliant
 check("4b compliant -> allow", gate_decision(d), "allow")
 
 for d in Path(tempfile.gettempdir()).glob("conv_*"):
