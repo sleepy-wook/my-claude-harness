@@ -1,6 +1,6 @@
 ---
 name: wook-map
-description: Build or refresh this project's map at .claude/project-map.md — the living "structure + stack + how to run/exercise" doc the evaluator and future work read. Triggers: "build the project map", "refresh project-map", "document how to run this project", "onboard this repo"; or after the structure, stack, or run/build/test commands changed. Not for one-off edits.
+description: Use to build or refresh this project's map (`.claude/project-map.md`: structure + stack + how to run/exercise). Triggers: "build the project map", "refresh project-map", "document how to run this project"; after the structure, stack, or run/build/test commands changed. Not for onboarding a whole repo (use wook-onboard) or one-off edits.
 ---
 
 # /wook-map — build the project map

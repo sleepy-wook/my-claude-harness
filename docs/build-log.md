@@ -64,6 +64,7 @@
 | 2026-06-11 | #13 프로젝트 지도 `.claude/project-map.md`(구조+스택+실행법, AI 자동유지) | 평가자가 "어떻게 띄우고 뭘 보나" 즉흥하던 빈 곳 메움. 형식=MD+YAML블록+ASCII tree(JSON 주석불가 ✗, 순수YAML 어색 ✗). **고정 섹션 스키마**(평가자가 어디 볼지 항상 앎) |
 | 2026-06-11 | project-map 설계를 **독립 리뷰어(타 에이전트)로 평가** 후 개정 | 제안자(나) 자기평가=편향 → 독립 평가가 run: 신뢰성·env 누락·recipe 중복 등 6개 실약점 적시. smoke→recipe 연결, env/services 추가, run 출처포인터, verified 스탬프 반영 |
 | 2026-06-11 | #14 `/wook-onboard` — 기존 repo 한 방 온보딩(오케스트레이터) | 진행중 프로젝트=`.claude` 텅 빔 → map+recipe+conventions+reuse-index 한 번에. 기존 3스킬 재사용+recipe derive만 신규. 제안→승인→작성(대량/게이트ON 가드), 멱등 |
+| 2026-06-11 | 스킬 전수 **독립 감사**(타 에이전트) → 트리거 충돌·CSO 정리 | 죽은/중복 스킬 0(자를것·합칠것 없음). 단 `"onboard this repo"`가 map/conventions/onboard 3곳에 걸린 충돌 발견 → map·conventions·index에서 온보딩 트리거 제거(onboard가 유일 front door), plan/index/map description CSO 정리 |
 
 ---
 

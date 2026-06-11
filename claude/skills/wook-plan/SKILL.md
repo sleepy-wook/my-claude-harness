@@ -1,6 +1,6 @@
 ---
 name: wook-plan
-description: Use at the START of a non-trivial feature or task, before writing code, to define what "done" means. Triggers: "plan this", "write a spec", "define acceptance criteria", "what's the plan for"; a request to implement a medium-or-larger feature when no spec/recipe exists yet. Not for trivial edits, lookups, or questions.
+description: Use at the START of a non-trivial feature or task, before writing code. Triggers: "plan this", "write a spec", "define acceptance criteria", "what's the plan for"; a request to implement a medium-or-larger feature when no spec/recipe exists yet. Not for trivial edits, lookups, or questions.
 ---
 
 # /wook-plan — Planner (define "done" before coding)

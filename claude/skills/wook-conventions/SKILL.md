@@ -1,6 +1,6 @@
 ---
 name: wook-conventions
-description: Use to set up or refresh a project's coding conventions for a domain (frontend/backend/db/infra/data/shared). Triggers: "set up conventions", "define the style guide / theme", "what are our frontend conventions", "establish conventions for <domain>", "refresh the conventions"; starting a new project that should follow a convention, or onboarding an existing codebase. Not for one-off edits.
+description: Use to set up or refresh a project's coding conventions for a domain (frontend/backend/db/infra/data/shared). Triggers: "set up conventions", "define the style guide / theme", "what are our frontend conventions", "establish conventions for <domain>", "refresh the conventions"; starting a new project that should follow a convention. Not for onboarding a whole repo (use wook-onboard) or one-off edits.
 ---
 
 # /wook-conventions — establish or extract a domain's conventions
