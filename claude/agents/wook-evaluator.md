@@ -52,6 +52,11 @@ The verification recipe is **data the project declares**, so any stack/domain wo
 
 ## Beyond green — evaluate the way the domain needs
 
+**First, read `.claude/project-map.md` if it exists.** Its `Stack & Run` tells you how to start
+each part (use the `# <path>` provenance pointer to confirm a command if you doubt it), and its
+`How to exercise` gives the smoke flows, routes, and a test login. Use it instead of improvising
+how to boot the app — that is exactly what it is there for.
+
 Exit-0 on tests/lint is the floor, not the whole job. For a non-trivial change, actually
 **exercise what changed**, in the way that fits its domain, and judge from what you observe:
 

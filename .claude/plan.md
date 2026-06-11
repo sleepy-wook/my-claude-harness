@@ -105,3 +105,36 @@ deploy:    python deploy.py --check
 
 ## 산출물(추가)
 - `claude/hooks/remind_evaluator.py`, `claude/agents/wook-evaluator.md`(수정), `tools/test_evaluator.py`
+
+---
+
+# SPEC — 프로젝트 지도 `.claude/project-map.md` (#13)
+
+> 2026-06-11 승인. AI가 지속 유지하는 살아있는 "구조+스택+실행법" 문서. 평가자가 이걸 읽어
+> 앱을 띄우고 굴려봄(즉흥 제거). 독립 리뷰 6개 반영. 고정 섹션 스키마(모든 프로젝트 동일).
+
+## 고정 스키마
+- 섹션 4개·순서 고정: **Stack & Run / Structure / How to exercise / Entry points**(영어 앵커).
+- YAML 키 고정: `stack, env, services, run.<domain>.{install,dev,url,test,build}`.
+- 독립 리뷰 반영: ① smoke는 `evaluate.recipe`에 묶고 여기선 가리킴(중복 제거) ② `env`(필수 변수)
+  ③ `run` 명령에 `# 출처` 포인터(요약+가리킴) ④ services/포트 줄 ⑤ `verified: 날짜@sha` 스탬프
+  ⑥ 테스트 로그인 / Structure ≤2레벨.
+
+## Scope — IN
+1. `harness/project-map.example` — 고정 스키마 템플릿.
+2. `/wook-map` 스킬 — 코드 훑어 스키마대로 작성/갱신(run은 package.json/pyproject/compose에서
+   derive + 출처 포인터). `/wook-index`·`/wook-conventions`의 형제.
+3. core-rules: "지도 있으면 실행·검증 시 따르고, 구조/스택/실행 바뀌면 갱신" 1줄.
+4. `wook-evaluator`: 굴리기 전 `project-map.md`의 `run`/`How to exercise`를 읽어 띄움(즉흥 X).
+
+## Scope — OUT
+- project-map 포인터 스테일 검사 hook(Entry points 소수라 v1 제외), 새 inject hook(주입 4번째 회피).
+
+## Acceptance criteria (`tools/test_project_map.py` + selfcheck)
+1. `selfcheck` exit 0(wook-map frontmatter 유효).
+2. 템플릿에 고정 4섹션이 순서대로 + YAML 키(stack/env/services/run) 존재 + run에 `#` 출처 포인터.
+3. (PyYAML 있으면) 템플릿 YAML 블록이 실제 파싱됨.
+
+## 산출물(추가)
+- `claude/harness/project-map.example`, `claude/skills/wook-map/SKILL.md`,
+  `claude/agents/wook-evaluator.md`(수정), `claude/harness/core-rules.md`(수정), `tools/test_project_map.py`
