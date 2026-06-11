@@ -42,6 +42,16 @@ python deploy.py          # claude/ → ~/.claude 배포 + settings.json에 hook
 - **Claude Code 재시작** — 스킬/에이전트는 세션 시작 시 로드(첫 배포 후 1회). hook은 재시작 없이 곧 반영.
 - 새 PC 복원: `clone → deploy → 재시작` 반복.
 
+### 멀티 에이전트 — Codex도 지원 (v1)
+같은 소스를 Codex로도 배포한다 (Codex가 hooks/skills/MCP를 Claude와 거의 동일 스키마로 미러):
+```bash
+python deploy.py --target=codex     # ~/.codex 로: hooks.json·skills/·AGENTS.md·agents/wook-evaluator.toml
+```
+- hook **스크립트는 공유**(stdin JSON 스키마 동일). 다른 건 등록 파일(settings.json↔`hooks.json`)·규칙 파일
+  (core-rules↔`AGENTS.md`)·평가자 래퍼(`.md`↔`.toml`)뿐 — 어댑터가 얇다.
+- ⚠️ **정직한 한계:** Codex `apply_patch` 편집 hook 발동·정확한 스키마는 **설치된 Codex 버전에서 경험적
+  확인** 필요(hooks는 v0.124.0+). 자동포맷·보호경로 deny가 여기 달림.
+
 ---
 
 ## 2. 스킬 한눈에
