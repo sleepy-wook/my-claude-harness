@@ -50,7 +50,7 @@ def copy_tree(
         if transform is None:
             new = f.read_bytes()
             same = target.exists() and target.read_bytes() == new
-            writer = target.write_bytes
+            writer = lambda data=new: target.write_bytes(data)  # noqa: E731
         else:
             new = transform(f.read_text(encoding="utf-8"))
             same = target.exists() and target.read_text(encoding="utf-8") == new
