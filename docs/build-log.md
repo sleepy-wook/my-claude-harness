@@ -56,6 +56,8 @@
 | 2026-06-02 | 신규 skill/agent 추가는 보류(빌트인과 중복 회피) | 코드리뷰=`/code-review`·탐색=`Explore`·리서치=`/deep-research`로 이미 커버. 유일 공백은 디버깅 규율 스킬(선택). over-build 회피(core-rules #1) |
 | 2026-06-09 | #9 재사용 카탈로그: **도메인별 2단계(매니페스트+실제소스), Skill.md 미사용** | Snowflake/Databricks 패턴. 포인터 hook(주입)+`/wook-index`(생성). 실제소스=상세라 안 낡음 |
 | 2026-06-11 | main(재사용 카탈로그) ← 작업 브랜치 merge | 두 갈래(연구·brainstorm·게이트수정·CSO ↔ 재사용 카탈로그) 통합. core-rules 중복제거(우리 wook-plan 규칙을 main '하네스 워크플로' 섹션에 흡수), Brainstorm 섹션 #9→**#10** 재번호(재사용 카탈로그가 #9) |
+| 2026-06-11 | #11 컨벤션 시스템(도메인별 코딩 규칙/스타일) — 재사용 카탈로그의 형제 | 프로젝트별 `.claude/conventions/<domain>.md`, 값은 소스 포인터(안 낡음). 형제 hook 2개(포인터 주입+스테일 검사) — main `check_reuse_pointers` 안 건드림. 게이트 강제는 기존 Stop 게이트 재사용. frontend 슬라이스부터(over-build 회피). test_conventions 6/6 PASS |
+| 2026-06-11 | `/wook-conventions` = **bimodal**(greenfield 확정 / brownfield 추출) | 빈 프로젝트는 코딩 전 확정, 진행된 프로젝트는 도메인 코드만 훑어 초안+불일치 플래그 |
 
 ---
 
@@ -206,6 +208,37 @@
 
 ---
 
+## 2-D. 코딩 컨벤션 (conventions)
+
+설계: `.claude/plan.md`(2번째 SPEC). 재사용 카탈로그의 **형제** — "뭘 재사용?"이 아니라
+"어떤 규칙/스타일로?". 도메인별 컨벤션(테마·색·네이밍·API 형태…)을 AI가 항상 참고/유지.
+같은 "파일 존재=ON" + "AI 판단 / hook 결정론" 분담 패턴. **frontend 슬라이스부터** 빌드.
+
+### ✅ #11 컨벤션 시스템 — 포인터 hook + 스테일검사 + `/wook-conventions` (검증됨, frontend 슬라이스)
+- **구조:** `.claude/conventions/<domain>.md` — 규칙(판단)은 prose, **값은 실제 소스(`path:symbol`)
+  포인터로**(복제 X = 안 낡음). 수직(frontend/backend/db/infra/data)은 도메인별, 횡단(`shared.md`:
+  테스트·보안·로깅/에러·git)은 "항상" 적용.
+- **파일:**
+  - `~/.claude/hooks/inject_convention_pointer.py` — UserPromptSubmit(3번째). conventions 있으면
+    매 턴 "shared 항상 + 도메인별 읽어라" 포인터만 주입, 없으면 무출력. (reuse 포인터의 형제)
+  - `~/.claude/hooks/check_convention_pointers.py` — Stop(비차단, 형제). 코드 변경 시 컨벤션
+    포인터(`path:symbol`) 해석 검사 → 스테일이면 "갱신/`/wook-conventions`" **알림만**.
+  - `~/.claude/skills/wook-conventions/SKILL.md` — `/wook-conventions` **bimodal**: greenfield=질문하며
+    확정(코딩 전), brownfield=도메인 코드만 훑어 초안+불일치 플래그. 기계검증 규칙은 recipe에 제안.
+  - `~/.claude/harness/conventions.frontend.example` — frontend 컨벤션 템플릿(예시).
+- **게이트 강제:** 기계검증 가능 규칙(예: raw-hex 금지)은 프로젝트 `evaluate.recipe`에 체크로 박힘
+  → **기존 Stop 게이트가 강제**(새 강제 장치 X, 재사용). 문서엔 `[강제: <체크>]` 표기로 문서↔게이트 동기화.
+- **유지보수:** *추가/변경/폐기*(판단)=AI 기본값(core-rules에 1줄 추가), *스테일 탐지*(결정론)=hook.
+  재사용 카탈로그와 1:1 대칭.
+- **검증(실제 실행, `tools/test_conventions.py` **6/6 PASS**):** ① 포인터 hook(있으면 shared+도메인
+  주입/없으면 무출력) ② 스테일 탐지(없는 심볼→알림, 유효→무알림) ③ **게이트 강제 데모**(샘플 recipe의
+  raw-hex 체크 위반→block, 준수→allow). selfcheck exit 0(9 scripts, 6 frontmatter).
+- **OUT(나중 복제):** backend/db/infra/data/shared 실제 컨벤션 파일, 실제 stylelint 설치(프로젝트 책임).
+  기계장치는 1회로 끝 — 이후 도메인 추가 = `conventions/<domain>.md` + recipe 한 줄.
+- **참고:** `test_conventions.py`는 STATE_DIR을 정리해 repo 게이트와 충돌 가능 → recipe엔 안 넣고 빌드 중 수동 실행.
+
+---
+
 ## 3. 파일 인벤토리 (`~/.claude`)
 
 ```
@@ -216,19 +249,23 @@
 │  ├─ format_py.py                    # #1 자동 포맷
 │  ├─ inject_core_rules.py            # #2 망각 방지 주입
 │  ├─ inject_reuse_pointer.py         # #9 재사용 카탈로그 포인터
+│  ├─ inject_convention_pointer.py    # #11 컨벤션 포인터
 │  ├─ evaluate_gate.py                # #7 자동 게이트(Stop hook)
-│  └─ check_reuse_pointers.py         # #9 스테일 포인터 알림(Stop hook, 비차단)
+│  ├─ check_reuse_pointers.py         # #9 스테일 포인터 알림(Stop hook, 비차단)
+│  └─ check_convention_pointers.py    # #11 컨벤션 스테일 알림(Stop hook, 비차단)
 ├─ harness/
 │  ├─ core-rules.md                   # 주입되는 규칙(편집 대상)
 │  ├─ core-rules.README.md            # 규칙 작성 가이드
-│  └─ evaluate.recipe.example         # 검증 레시피 템플릿(프로젝트로 복사)
+│  ├─ evaluate.recipe.example         # 검증 레시피 템플릿(프로젝트로 복사)
+│  └─ conventions.frontend.example    # #11 frontend 컨벤션 템플릿
 ├─ agents/
 │  └─ wook-evaluator.md               # #5 독립 Evaluator 서브에이전트
 └─ skills/
    ├─ wook-evaluate/SKILL.md          # /wook-evaluate 진입점
    ├─ wook-plan/SKILL.md              # #8 /wook-plan (Planner)
    ├─ wook-brainstorm/SKILL.md        # #10 /wook-brainstorm (발산, PGE 앞단)
-   └─ wook-index/SKILL.md             # #9 /wook-index (재사용 카탈로그 생성)
+   ├─ wook-index/SKILL.md             # #9 /wook-index (재사용 카탈로그 생성)
+   └─ wook-conventions/SKILL.md       # #11 /wook-conventions (컨벤션 생성, bimodal)
 ```
 
 ---
@@ -245,13 +282,13 @@ my-claude-harness/                  # git repo (비밀 0, 단순 blacklist .giti
 ├─ CLAUDE.md                        # 이 repo 작업 시 컨벤션(build-log 갱신 등)
 ├─ docs/{claude-harness-design, build-log}.md
 ├─ claude/                          # ~/.claude 산출물의 source of truth
-│  ├─ hooks/{guard_paths, format_py, inject_core_rules, inject_reuse_pointer, evaluate_gate, check_reuse_pointers}.py
-│  ├─ harness/{core-rules.md, core-rules.README.md, evaluate.recipe.example}
+│  ├─ hooks/{guard_paths, format_py, inject_core_rules, inject_reuse_pointer, inject_convention_pointer, evaluate_gate, check_reuse_pointers, check_convention_pointers}.py
+│  ├─ harness/{core-rules.md, core-rules.README.md, evaluate.recipe.example, conventions.frontend.example}
 │  ├─ agents/wook-evaluator.md       # #5 Evaluator 서브에이전트
-│  ├─ skills/{wook-evaluate, wook-plan, wook-brainstorm, wook-index}/SKILL.md  # 진입점
+│  ├─ skills/{wook-evaluate, wook-plan, wook-brainstorm, wook-index, wook-conventions}/SKILL.md  # 진입점
 │  └─ settings.hooks.json           # 우리가 소유한 hooks 블록({HOOKS_DIR} placeholder)
 ├─ deploy.py                        # claude/ -> ~/.claude 배포 (--check drift시 exit 1)
-├─ tools/selfcheck.py               # repo 자기검증(컴파일·settings·frontmatter·비밀)
+├─ tools/{selfcheck.py, test_conventions.py}  # 자기검증 + 컨벤션 행동 테스트(#11)
 ├─ .claude/{evaluate.recipe, plan.md}  # 이 repo 자신의 게이트 설정(자기검증 ON)
 └─ .gitignore
 ```
