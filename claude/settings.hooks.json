@@ -44,6 +44,13 @@
             "args": ["{HOOKS_DIR}/inject_reuse_pointer.py"],
             "timeout": 15,
             "statusMessage": "reuse pointer"
+          },
+          {
+            "type": "command",
+            "command": "python",
+            "args": ["{HOOKS_DIR}/inject_convention_pointer.py"],
+            "timeout": 15,
+            "statusMessage": "convention pointer"
           }
         ]
       }
@@ -64,6 +71,20 @@
             "args": ["{HOOKS_DIR}/check_reuse_pointers.py"],
             "timeout": 30,
             "statusMessage": "reuse pointer check"
+          },
+          {
+            "type": "command",
+            "command": "python",
+            "args": ["{HOOKS_DIR}/check_convention_pointers.py"],
+            "timeout": 30,
+            "statusMessage": "convention pointer check"
+          },
+          {
+            "type": "command",
+            "command": "python",
+            "args": ["{HOOKS_DIR}/remind_evaluator.py"],
+            "timeout": 20,
+            "statusMessage": "evaluator reminder"
           }
         ]
       }

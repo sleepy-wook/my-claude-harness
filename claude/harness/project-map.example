@@ -1,0 +1,35 @@
+# Project Map — myshop   (AI-maintained, 예시 템플릿)
+
+> 구조·스택·실행법이 바뀌면 같은 작업에서 이 파일을 갱신한다. 명령은 실제 소스
+> (package.json/pyproject/compose 등)의 **캐시**이므로 `# 출처` 포인터를 함께 둔다.
+> 스모크 검증은 `.claude/evaluate.recipe`에 묶고 여기선 **가리키기만** 한다(복제 X). Structure는 ≤2레벨.
+> **섹션 이름·순서·YAML 키는 고정**(모든 프로젝트 동일). 내용/언어는 프로젝트 자유.
+
+## Stack & Run   <!-- verified: 2026-06-11 @ <git-sha> -->
+```yaml
+stack:    { frontend: "React19+Vite+TS, Tailwind", backend: "FastAPI(py3.12)", db: "PostgreSQL16" }
+env:      "cp .env.example .env; required: DATABASE_URL, JWT_SECRET"
+services: "postgres:5432 (docker compose); /checkout는 Stripe 테스트키 필요"
+run:
+  web: { install: "pnpm -C web i", dev: "pnpm -C web dev  # web/package.json:scripts.dev", url: "http://localhost:5173", test: "pnpm -C web test" }
+  api: { install: "uv sync --project api", dev: "uv run -C api fastapi dev  # api/pyproject.toml", url: "http://localhost:8000", test: "uv run -C api pytest" }
+  db:  { up: "docker compose up -d db", migrate: "uv run -C api alembic upgrade head" }
+```
+
+## Structure   (≤2 levels — keep shallow)
+```
+myshop/
+├─ web/   # 프론트(React+Vite) · src/{routes,components,theme}
+├─ api/   # 백엔드(FastAPI) · app/{routers,services,models}, migrations/
+└─ docker-compose.yml
+```
+
+## How to exercise
+- smoke (deterministic) = run `.claude/evaluate.recipe`   ← 실행 가능한 진실, 여기서 복제하지 않음
+- frontend (평가자가 Playwright로 봄): routes `/`, `/cart`, `/checkout`; 테스트 로그인 `demo@example.com / demo`
+- backend: `GET /health`→200; `POST /orders {items:[…]}`→201 `{id}`; docs `/docs`
+- db: dev creds `.env.example`; `alembic upgrade head` 후 시드 `scripts/seed.py`
+
+## Entry points   (boot/root symbols only, 1–3 lines)
+- web app root · web/src/main.tsx:App
+- api app · api/app/main.py:app

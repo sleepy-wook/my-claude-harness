@@ -1,0 +1,27 @@
+# frontend 컨벤션 (예시 템플릿)
+
+> `/wook-conventions frontend`가 만드는 `.claude/conventions/frontend.md`의 예시.
+> **규칙만** 적고 값은 실제 소스(토큰 파일)를 `path:symbol`로 가리킨다 → 값은 안 낡음.
+> `inject_convention_pointer` hook이 매 턴 "프론트 작업 전 이 문서 읽어라" 안내.
+
+## 테마
+- 라이트/다크 둘 다 지원. 색은 토큰으로만 — **raw hex 직접 사용 금지**.  [강제: style]
+
+## 색 (source of truth 포인터)
+- primary · 주요 CTA·강조, hover=명도 -8%, active=-16%, disabled=40% opacity · src/theme/tokens.ts:primary
+- secondary · 보조 액션 · src/theme/tokens.ts:secondary
+- danger · 파괴적 행동(삭제 등)에만 · src/theme/tokens.ts:danger
+
+## 간격 / 타이포
+- 간격: 4/8px 그리드만(임의 px 금지).  [강제: style]
+- 타이포: 정의된 스케일(text-sm ~ text-3xl)만.
+
+## 컴포넌트
+- 네이밍: PascalCase, 한 파일 한 컴포넌트.
+- 상태(hover/active/disabled)는 토큰 파생값으로 — 개별 하드코딩 금지.
+
+## 강제(게이트) — `.claude/evaluate.recipe`에 추가
+```
+style: npx stylelint "**/*.{css,tsx}"   # raw hex·임의 px 금지 룰 포함
+```
+> 위 `[강제: style]` 규칙은 이 체크로 강제된다(문서↔게이트 동기화). 규칙 바꾸면 둘 다 갱신.

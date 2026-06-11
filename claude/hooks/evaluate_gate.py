@@ -15,7 +15,10 @@ exit codes). This kills the "claimed done without running the checks" failure mo
 Activation (all must hold, else it allows the stop cheaply):
 1. `.claude/evaluate-off` does NOT exist (project root or an ancestor).
 2. `.claude/evaluate.recipe` exists (its presence = gate active here).
-3. Code changed this session (uncommitted code files; non-git => assumed yes).
+3. There is something to verify: uncommitted code files, OR the commit (HEAD) has
+   advanced past the last commit we verified (so committing inside a turn can't slip
+   past the gate). non-git => always verify. The first stop in a fresh git project
+   verifies the current HEAD once, then stays quiet on clean, unchanged checkouts.
 
 Runaway/oscillation guard (§0-4): normalized failure signature; same signature
 STALL_LIMIT times in a row => give up (stuck); a changing failure resets stuck but
@@ -127,15 +130,39 @@ def run(cmd, cwd: Path) -> tuple[int, str]:
         return 0, f"(could not run {cmd}: {e})"  # non-blocking
 
 
-def code_changed(root: Path) -> bool:
+def dirty_code(root: Path) -> bool | None:
+    """True: uncommitted code files present. False: clean git tree. None: not a git repo."""
     _, out = run(["git", "status", "--porcelain"], root)
     if "fatal:" in out or out.startswith("(could not run"):
-        return True
+        return None  # not a git repo (or git unavailable)
     for line in out.splitlines():
         path = line[3:].strip().strip('"')
         if Path(path).suffix.lower() in CODE_EXT:
             return True
     return False
+
+
+def head(root: Path) -> str | None:
+    """Current commit SHA, or None if not a git repo."""
+    rc, out = run(["git", "rev-parse", "HEAD"], root)
+    out = out.strip()
+    return out if rc == 0 and out and "fatal:" not in out else None
+
+
+def needs_eval(root: Path, verified_head: str | None) -> bool:
+    """Is there anything to verify on this stop?
+
+    Uncommitted code => yes. Otherwise, on a clean git tree, yes only if HEAD has
+    moved past the commit we last verified (catches edit→commit→stop in one turn).
+    Non-git checkouts can't be tracked by commit, so they always verify.
+    """
+    dc = dirty_code(root)
+    if dc is None:
+        return True  # not git => can't track commits, verify every time (as before)
+    if dc:
+        return True  # uncommitted code changes
+    h = head(root)  # clean tree: did the commit advance past the last verified one?
+    return h is not None and h != verified_head
 
 
 def signature(text: str) -> str:
@@ -154,9 +181,11 @@ def state_path(root: Path) -> Path:
 
 def read_state(root: Path) -> dict:
     try:
-        return json.loads(state_path(root).read_text())
+        st = json.loads(state_path(root).read_text())
+        st.setdefault("verified_head", None)
+        return st
     except Exception:
-        return {"attempts": 0, "sig": None, "stuck": 0}
+        return {"attempts": 0, "sig": None, "stuck": 0, "verified_head": None}
 
 
 def write_state(root: Path, st: dict) -> None:
@@ -167,11 +196,10 @@ def write_state(root: Path, st: dict) -> None:
         pass
 
 
-def reset_state(root: Path) -> None:
-    try:
-        state_path(root).unlink()
-    except Exception:
-        pass
+def reset_episode(root: Path, verified_head: str | None) -> None:
+    """Clear the retry/stuck counters for a new episode, but KEEP verified_head
+    (which records the last commit that passed, so it must survive across episodes)."""
+    write_state(root, {"attempts": 0, "sig": None, "stuck": 0, "verified_head": verified_head})
 
 
 # ---- main ------------------------------------------------------------------
@@ -193,12 +221,15 @@ def main() -> int:
     if checks is None:
         return allow()  # no recipe => gate not active in this project
 
-    if not code_changed(root):
-        reset_state(root)
+    st = read_state(root)
+    verified_head = st.get("verified_head")
+
+    if not needs_eval(root, verified_head):
+        reset_episode(root, verified_head)  # nothing to verify; keep verified_head
         return allow()
 
     if not event.get("stop_hook_active"):
-        reset_state(root)
+        reset_episode(root, verified_head)  # fresh episode; keep verified_head
 
     failures = []
     for name, cmd in checks:
@@ -207,7 +238,9 @@ def main() -> int:
             failures.append((name, cmd, out))
 
     if not failures:
-        reset_state(root)
+        # Passed: record the commit we just verified so a clean tree at this HEAD
+        # won't re-trigger, but a later commit will.
+        reset_episode(root, head(root))
         return allow()
 
     combined = "\n\n".join(f"[{n}] {c}\n{o}" for n, c, o in failures)
@@ -220,19 +253,21 @@ def main() -> int:
     stuck = st.get("stuck", 0) + 1 if sig == st.get("sig") else 1
 
     if stuck >= STALL_LIMIT:
-        reset_state(root)
+        reset_episode(root, verified_head)
         return give_up(
             f"⚠️ auto-evaluate gate: stuck on the SAME failing result {stuck}x in a "
             f"row (no progress) — [{failed}]. Stopping the auto-loop; your turn.\n\n{tail}"
         )
     if attempts >= MAX_ATTEMPTS:
-        reset_state(root)
+        reset_episode(root, verified_head)
         return give_up(
             f"⚠️ auto-evaluate gate: {MAX_ATTEMPTS} attempts without passing "
             f"[{failed}] — not converging. Stopping the auto-loop; your turn.\n\n{tail}"
         )
 
-    write_state(root, {"attempts": attempts, "sig": sig, "stuck": stuck})
+    write_state(
+        root, {"attempts": attempts, "sig": sig, "stuck": stuck, "verified_head": verified_head}
+    )
     progress = "same failure" if stuck > 1 else "new failure"
     return block(
         f"Auto-evaluate gate: NOT passing — not done yet (attempt "

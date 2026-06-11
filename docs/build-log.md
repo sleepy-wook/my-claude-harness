@@ -48,7 +48,23 @@
 | 2026-06-01 | 커스텀 스킬/에이전트 **`wook-` 접두사**(`/wook-plan`·`/wook-evaluate`·`wook-evaluator`) | 네이티브 plan 모드·플러그인과 충돌/혼동 제거(형욱 닉네임 네임스페이스) |
 | 2026-06-01 | 게이트 **default-ON by 레시피**(opt-in 마커 폐지, off=`.claude/evaluate-off`) | "켜는 걸 깜빡" 제거 — 레시피 존재=ON, `/wook-plan`이 레시피 보장 |
 | 2026-06-01 | **하네스 자기검증**(dogfood): `/wook-plan`으로 `.claude/evaluate.recipe`+`tools/selfcheck.py` 작성 | repo가 자기 무결성 검증. 게이트 통과/차단 둘 다 실증, `deploy --check`는 drift 시 exit 1로 개선 |
+| 2026-06-02 | core-rules 4번째 규칙 추가(신규 구현 요청 시 `/wook-plan` 제안) | 매 프롬프트 주입되는 규칙으로 PGE Plan 단계를 자연 유도 — 게이트 default-ON(레시피 존재=ON)과 맞물림. (이후 merge에서 main '하네스 워크플로' 섹션에 흡수) |
+| 2026-06-02 | `/wook-brainstorm` 신설(PGE 앞단 발산), plan과 별도 스킬로 분리 | plan=수렴(recipe), brainstorm=발산 — 본질이 달라 분리 가치 有. 크기/도메인별 분할은 호출 결정비용만 키워 회피(plan 내부 흡수) |
+| 2026-06-02 | sub-agent를 PGE 너머 *읽기 전용 전문가 풀*로 확장하는 방향 합의 | "쓰기=메인 단일 스레드, 읽기/판정=sub-agent"(§0-3). evaluator가 1번 멤버, brainstorm fan-out이 응용. 대량 신설 대신 필요 시 1개씩(over-build 회피) |
+| 2026-06-02 | #7 게이트 커밋 우회 구멍 메움(`verified_head` 추적) | 턴 안 커밋→stop이 테스트 0회로 통과하던 실제 우회로 차단. SessionStart hook 신설 대신 evaluate_gate.py 자체에서 해결(표면 최소화). 7/7 시나리오 테스트 통과 |
+| 2026-06-02 | 스킬/에이전트 `description`에 **CSO 규칙** 적용(트리거 조건만, 워크플로 요약 제거) | superpowers 차용. description이 워크플로를 담으면 모델이 본문을 안 읽고 지름길 탐 → 트리거만 남겨 호출 신뢰성↑. 신규 스킬도 이 규칙 따름 |
+| 2026-06-02 | 신규 skill/agent 추가는 보류(빌트인과 중복 회피) | 코드리뷰=`/code-review`·탐색=`Explore`·리서치=`/deep-research`로 이미 커버. 유일 공백은 디버깅 규율 스킬(선택). over-build 회피(core-rules #1) |
 | 2026-06-09 | #9 재사용 카탈로그: **도메인별 2단계(매니페스트+실제소스), Skill.md 미사용** | Snowflake/Databricks 패턴. 포인터 hook(주입)+`/wook-index`(생성). 실제소스=상세라 안 낡음 |
+| 2026-06-11 | main(재사용 카탈로그) ← 작업 브랜치 merge | 두 갈래(연구·brainstorm·게이트수정·CSO ↔ 재사용 카탈로그) 통합. core-rules 중복제거(우리 wook-plan 규칙을 main '하네스 워크플로' 섹션에 흡수), Brainstorm 섹션 #9→**#10** 재번호(재사용 카탈로그가 #9) |
+| 2026-06-11 | #11 컨벤션 시스템(도메인별 코딩 규칙/스타일) — 재사용 카탈로그의 형제 | 프로젝트별 `.claude/conventions/<domain>.md`, 값은 소스 포인터(안 낡음). 형제 hook 2개(포인터 주입+스테일 검사) — main `check_reuse_pointers` 안 건드림. 게이트 강제는 기존 Stop 게이트 재사용. frontend 슬라이스부터(over-build 회피). test_conventions 6/6 PASS |
+| 2026-06-11 | `/wook-conventions` = **bimodal**(greenfield 확정 / brownfield 추출) | 빈 프로젝트는 코딩 전 확정, 진행된 프로젝트는 도메인 코드만 훑어 초안+불일치 플래그 |
+| 2026-06-11 | `/wook-conventions` 안내를 **도메인 중립으로 일반화** | 기계장치는 처음부터 도메인 무관이나 스킬 *예시*가 frontend 편향 → "도메인별 무엇을 담는지" 힌트표(front/back/db/infra/data/shared)로 교체, greenfield/brownfield·문서예시 다도메인화. `.frontend.example`은 예시 1개로 유지 |
+| 2026-06-11 | #12 독립 평가자: **Playwright MCP + 도메인별 실제 평가 + 망각 제거 리마인더** | 본인 자기평가 ❌·딴 평가자가 화면 직접 봄. MCP는 LLM 평가자 층에만(셸 게이트는 브라우저 못 굴림). 평가자 allowlist에 `mcp__playwright__*`(빌트인 브라우저 배제), Iron law를 관찰사실까지 확장 |
+| 2026-06-11 | 평가자 호출 트리거 = **본인 판단 + 결정론 리마인더**(강제 차단 X) | "사소 vs 비사소"는 기계 판단 부적합(1줄도 클 수 있음) → 본인 판단. 단 "큰 변경에도 까먹음" 해결 위해 코드변경 턴에 비차단 알림. frontend 슬라이스부터(over-build 회피) |
+| 2026-06-11 | #13 프로젝트 지도 `.claude/project-map.md`(구조+스택+실행법, AI 자동유지) | 평가자가 "어떻게 띄우고 뭘 보나" 즉흥하던 빈 곳 메움. 형식=MD+YAML블록+ASCII tree(JSON 주석불가 ✗, 순수YAML 어색 ✗). **고정 섹션 스키마**(평가자가 어디 볼지 항상 앎) |
+| 2026-06-11 | project-map 설계를 **독립 리뷰어(타 에이전트)로 평가** 후 개정 | 제안자(나) 자기평가=편향 → 독립 평가가 run: 신뢰성·env 누락·recipe 중복 등 6개 실약점 적시. smoke→recipe 연결, env/services 추가, run 출처포인터, verified 스탬프 반영 |
+| 2026-06-11 | #14 `/wook-onboard` — 기존 repo 한 방 온보딩(오케스트레이터) | 진행중 프로젝트=`.claude` 텅 빔 → map+recipe+conventions+reuse-index 한 번에. 기존 3스킬 재사용+recipe derive만 신규. 제안→승인→작성(대량/게이트ON 가드), 멱등 |
+| 2026-06-11 | 스킬 전수 **독립 감사**(타 에이전트) → 트리거 충돌·CSO 정리 | 죽은/중복 스킬 0(자를것·합칠것 없음). 단 `"onboard this repo"`가 map/conventions/onboard 3곳에 걸린 충돌 발견 → map·conventions·index에서 온보딩 트리거 제거(onboard가 유일 front door), plan/index/map description CSO 정리 |
 
 ---
 
@@ -72,10 +88,11 @@
 - **설정:** `settings.json` → `UserPromptSubmit`(matcher 미지원) / exec form / timeout 15
 - **검증:** 파이프 테스트(주석제거·H1제거·본문포함·캡 PASS) → **실 세션 발화 증명**
   (다음 턴 system reminder에 규칙 주입 확인). ✅ live
-- **현재 규칙(시드 3):**
+- **현재 규칙(시드 3 + 「하네스 워크플로(기본값)」 섹션):**
   1. 요청 안 한 변경(대량 파일 생성·비요청 리팩터링·스코프 확장)을 선호하지 않음
   2. 테스트 실제 실행 없이 "완료"라 하는 걸 신뢰 안 함(완료=실행 결과로 증명)
   3. 불확실하면 추측 말고 멈추고 확인받기 선호
+  - **하네스 워크플로(기본값)** 섹션 3줄: ① 중간+ 구현은 `/wook-plan`으로 시작(`.claude/plan.md` 없으면 코드 전 제안, 단순 수정/탐색/질문 제외) ② 새 코드 전 재사용 카탈로그(`.claude/reuse-index/`) 확인 ③ 새 재사용물 만들면 도메인 매니페스트에 한 줄 추가 (구 "규칙 4"는 merge 때 ①에 흡수)
 - **편집법:** `core-rules.md` 고치면 다음 프롬프트부터 자동 반영(재시작 불필요).
 
 ### ✅ #3 PreToolUse — 보호 경로 가드(deny)
@@ -121,8 +138,14 @@
 - **왜 command(스크립트)인가:** 매 턴 발동하니 **싸고 결정론적**이어야. LLM 안 씀. 판정은 실제
   exit code, 실패 시 테스트 출력 그대로 피드백. (깊은 분석은 `/wook-evaluate`의 LLM evaluator)
 - **발동 조건(default-ON by 레시피):** ① **`.claude/evaluate.recipe` 존재**(있으면 게이트 ON,
-  켜는 별도 단계 없음) ② **코드 변경**(git status) ③ `.claude/evaluate-off` 없음. 아니면 즉시 통과
+  켜는 별도 단계 없음) ② **검증할 게 있음**(아래 ②-수정) ③ `.claude/evaluate-off` 없음. 아니면 즉시 통과
   (거의 공짜) → 일반 대화·계획·레시피 없는 repo엔 영향 0. **"켜는 걸 깜빡" 시나리오 제거.**
+- **②-수정(2026-06-02, 커밋 우회 구멍 메움):** 기존엔 *미커밋 코드 변경*(git status)만 봤다 →
+  Claude가 **턴 안에서 커밋부터 하고 멈추면** 워킹트리가 깨끗 → 게이트가 그냥 통과(테스트 0회)하는
+  실제 우회로가 있었다. 수정: 상태에 **마지막으로 통과한 커밋(`verified_head`)**을 기록 → 워킹트리가
+  깨끗해도 **HEAD가 그 커밋에서 움직였으면(=세션 중 커밋됨) 다시 검증**. 미커밋 코드 변경 OR HEAD
+  전진 = 검증. 비-git은 종전대로 항상 검증. 깨끗·미변경(이미 통과한 HEAD)이면 조용히 통과(오발동 0).
+  새 git 프로젝트 첫 stop은 현재 HEAD를 1회 검증 후 기준점으로 기록.
 - **검증 레시피(유동적):** `.claude/evaluate.recipe`에 `name: 셸명령` 선언(어떤 stack/도메인이든) →
   게이트가 전부 실행, 미통과면 블로킹. 게이트는 레시피만 봄(무관 repo 안 건드림); 자동탐지 폴백은
   `/wook-evaluate`(온디맨드) 쪽. 템플릿: `~/.claude/harness/evaluate.recipe.example`
@@ -149,6 +172,21 @@
 - **PGE 완성:** Plan(기준 정의·레시피 작성) → Generate(구현) → Evaluate/게이트(그 레시피로 검증).
 - **검증:** 배포·frontmatter 유효 확인. (스킬=프롬프트라 exit code 테스트 불가; 동작은 호출 시 발현)
 - **활성화:** 다음 재시작부터 `/wook-plan` 호출 가능(스킬 목록 갱신 시 등록).
+
+### ✅ #10 Brainstorm — `/wook-brainstorm` (PGE 앞단 발산)
+- **목적:** plan이 *수렴*(수용기준→recipe)이라면, brainstorm은 *발산* — 문제/접근이 아직
+  열린 단계에서 **옵션을 넓히고 트레이드오프를 드러낸다.** 코드·recipe 둘 다 만들지 않음
+  (성급한 recipe = 틀린 기준 고착). 방향이 잡히면 `/wook-plan`으로 핸드오프.
+- **파일:** `~/.claude/skills/wook-brainstorm/SKILL.md` (`/wook-brainstorm` 진입점)
+- **흐름:** 문제 프레이밍(모호하면 질문) → 서로 다른 접근 2~4개(최소 1개는 의외의 것) →
+  정직한 비교(축: 단순성·위험·노력·가역성·harness 적합) → 추천(단 결정은 개발자) → plan 핸드오프.
+- **sub-agent 확장(형욱 직감 반영):** 발산 단계에서 **읽기 전용 sub-agent로 fan-out** 명시
+  — Explore/general-purpose로 기존 코드베이스 매핑, research 에이전트로 외부 prior art.
+  "쓰기는 메인 단일 스레드, 읽기/판정은 sub-agent"라는 안전 패턴(§0-3 LangChain)의 적용.
+  evaluator(읽기·실행·판정, write 없음)에 이은 *읽기 전용 전문가 풀*의 두 번째 자리.
+- **검증:** `python tools/selfcheck.py` exit 0(5 scripts compile, 4 md frontmatter ok —
+  brainstorm 포함). `deploy --check`는 이 임시 컨테이너에 미배포라 drift exit 1(변경 무관).
+- **활성화:** 다음 재시작부터 `/wook-brainstorm` 호출 가능.
 
 ---
 
@@ -177,6 +215,105 @@
 
 ---
 
+## 2-D. 코딩 컨벤션 (conventions)
+
+설계: `.claude/plan.md`(2번째 SPEC). 재사용 카탈로그의 **형제** — "뭘 재사용?"이 아니라
+"어떤 규칙/스타일로?". 도메인별 컨벤션(테마·색·네이밍·API 형태…)을 AI가 항상 참고/유지.
+같은 "파일 존재=ON" + "AI 판단 / hook 결정론" 분담 패턴. **frontend 슬라이스부터** 빌드.
+
+### ✅ #11 컨벤션 시스템 — 포인터 hook + 스테일검사 + `/wook-conventions` (검증됨, frontend 슬라이스)
+- **구조:** `.claude/conventions/<domain>.md` — 규칙(판단)은 prose, **값은 실제 소스(`path:symbol`)
+  포인터로**(복제 X = 안 낡음). 수직(frontend/backend/db/infra/data)은 도메인별, 횡단(`shared.md`:
+  테스트·보안·로깅/에러·git)은 "항상" 적용.
+- **파일:**
+  - `~/.claude/hooks/inject_convention_pointer.py` — UserPromptSubmit(3번째). conventions 있으면
+    매 턴 "shared 항상 + 도메인별 읽어라" 포인터만 주입, 없으면 무출력. (reuse 포인터의 형제)
+  - `~/.claude/hooks/check_convention_pointers.py` — Stop(비차단, 형제). 코드 변경 시 컨벤션
+    포인터(`path:symbol`) 해석 검사 → 스테일이면 "갱신/`/wook-conventions`" **알림만**.
+  - `~/.claude/skills/wook-conventions/SKILL.md` — `/wook-conventions` **bimodal**: greenfield=질문하며
+    확정(코딩 전), brownfield=도메인 코드만 훑어 초안+불일치 플래그. 기계검증 규칙은 recipe에 제안.
+  - `~/.claude/harness/conventions.frontend.example` — frontend 컨벤션 템플릿(예시).
+- **게이트 강제:** 기계검증 가능 규칙(예: raw-hex 금지)은 프로젝트 `evaluate.recipe`에 체크로 박힘
+  → **기존 Stop 게이트가 강제**(새 강제 장치 X, 재사용). 문서엔 `[강제: <체크>]` 표기로 문서↔게이트 동기화.
+- **유지보수:** *추가/변경/폐기*(판단)=AI 기본값(core-rules에 1줄 추가), *스테일 탐지*(결정론)=hook.
+  재사용 카탈로그와 1:1 대칭.
+- **검증(실제 실행, `tools/test_conventions.py` **6/6 PASS**):** ① 포인터 hook(있으면 shared+도메인
+  주입/없으면 무출력) ② 스테일 탐지(없는 심볼→알림, 유효→무알림) ③ **게이트 강제 데모**(샘플 recipe의
+  raw-hex 체크 위반→block, 준수→allow). selfcheck exit 0(9 scripts, 6 frontmatter).
+- **OUT(나중 복제):** backend/db/infra/data/shared 실제 컨벤션 파일, 실제 stylelint 설치(프로젝트 책임).
+  기계장치는 1회로 끝 — 이후 도메인 추가 = `conventions/<domain>.md` + recipe 한 줄.
+- **참고:** `test_conventions.py`는 STATE_DIR을 정리해 repo 게이트와 충돌 가능 → recipe엔 안 넣고 빌드 중 수동 실행.
+
+---
+
+## 2-E. 독립 평가자 — 도메인별 실제 평가 (Playwright MCP)
+
+문제: **본인이 자기 코드 평가 ❌**, 딴 평가자가 객관 평가해야 하는데 — 화면을 볼 수 있는 평가는
+LLM 평가자(서브에이전트)만 가능(결정론 셸 게이트는 브라우저 못 굴림). 게다가 그 평가자는 *본인이
+부를지 선택*이라 큰 변경에도 자주 까먹음. → "도메인 맞는 실제 평가 + 망각 제거".
+
+### ✅ #12 독립 평가자 강화 — Playwright MCP + 도메인별 평가 + 리마인더 (frontend 슬라이스)
+- **도구:** `wook-evaluator` allowlist에 `mcp__playwright__*` 추가, **빌트인 브라우저/WebFetch 제외**
+  (MCP만 강제). Edit/Write 제외 유지. (서브에이전트 `tools:` allowlist·MCP 와일드카드 문법은
+  `claude-code-guide`로 공식 확인 — 추측 안 함.)
+- **평가자 지시:** Iron law를 "exit 0 **또는 실제 관찰 사실**(렌더된 텍스트·응답 바디·콘솔 0에러)"로
+  확장 + **"도메인별 평가 방식"** 절(frontend=Playwright MCP 화면검증, backend=엔드포인트 호출,
+  db=쿼리, data=파이프라인, infra=plan). 도구/앱/MCP 없으면 **INCONCLUSIVE**(거짓 PASS 금지).
+- **망각 제거:** `~/.claude/hooks/remind_evaluator.py`(Stop, 비차단) — `.claude` 있는 프로젝트에서
+  코드 변경 턴이면 "사소하지 않으면 독립 평가자 호출" 알림(프론트 변경=Playwright 힌트).
+  **사소 판단은 본인 몫**(기계 강제 X), 시스템은 망각만 막음.
+- **표준 규칙:** core-rules에 "비사소 변경 → 본인이 평가 말고 독립 평가자, 도메인 맞는 검증" 1줄.
+- **두 층 상보:** 결정론 게이트(셸 green=바닥) + 독립 평가자(도메인 맞는 실제 검증=깊이). MCP는
+  LLM 평가자 층에만(게이트는 셸 유지).
+- **검증(`tools/test_evaluator.py` 6/6 PASS):** 리마인더(프론트→알림+Playwright / 백→알림 /
+  변경없음·`.claude`없음→무출력), 평가자 tools에 Playwright MCP 있고 Edit/Write/WebFetch 없음.
+  selfcheck exit 0(10 scripts). **한계: 실제 Playwright 화면검증은 MCP·브라우저·앱 필요 → 배포 후 라이브 시험으로만 검증(정직히 표시).**
+- **OUT:** backend/db/infra 실제 평가 자동화, Playwright MCP 서버 설치(프로젝트 책임), 강제 차단(지금은 넛지만).
+
+---
+
+## 2-F. 프로젝트 지도 (project map)
+
+평가자(#12)가 "어떻게 띄우고 뭘 보나"를 즉흥으로 알아내던 빈 곳을 메움. AI가 지속 유지하는
+살아있는 **구조+스택+실행법** 문서 `.claude/project-map.md`. 평가자가 이걸 읽어 앱을 띄우고 굴림.
+
+### ✅ #13 프로젝트 지도 — 고정 스키마 + `/wook-map` (검증됨)
+- **형식 결정:** MD 그릇 + YAML 블록(실행정보, 파싱 가능) + ASCII tree(구조) + 산문(How to exercise).
+  JSON ✗(주석 불가), 순수 YAML ✗(tree·산문 어색). 주 독자가 LLM이라 MD가 최적.
+- **고정 스키마(모든 프로젝트 동일):** 섹션 4개·순서 `Stack & Run`/`Structure`/`How to exercise`/
+  `Entry points`(영어 앵커) + YAML 키 `stack,env,services,run.<d>.{install,dev,url,test,build}`.
+- **독립 리뷰(타 에이전트) 반영 6:** ① smoke는 `evaluate.recipe`에 묶고 지도는 가리킴(중복/드리프트 제거)
+  ② `env`(필수 변수=자체부팅 최대 누락) ③ run 명령에 `# 출처` 포인터(요약+가리킴, 캐시임을 명시)
+  ④ services/포트 ⑤ `verified: 날짜@sha` 스탬프(스테일 가시화) ⑥ 테스트 로그인 / Structure ≤2레벨.
+- **파일:** `~/.claude/harness/project-map.example`(템플릿), `~/.claude/skills/wook-map/SKILL.md`
+  (`/wook-map`: 코드 훑어 스키마대로 작성, run은 package.json/pyproject/compose에서 derive+출처).
+- **연결:** core-rules 1줄(지도 있으면 실행·평가 시 따르고, 구조/스택/실행 바뀌면 갱신).
+  `wook-evaluator`가 "굴리기 전 project-map 읽어라"로 즉흥 제거.
+- **기존과 경계:** recipe=돌릴 체크(exit code) / conventions=코드 스타일 / **map=구조·실행법(지도)**.
+  How to exercise는 recipe를 *가리킴*(복제 X) — 리뷰가 짚은 최대 중복 위험 차단.
+- **검증(`tools/test_project_map.py` 11/11 PASS):** 고정 4섹션·순서, YAML 키(stack/env/services/run),
+  run에 `#` 출처 포인터, verified 스탬프, recipe 연결, PyYAML 파싱. selfcheck exit 0(7 frontmatter).
+- **OUT:** project-map 포인터 스테일 hook(Entry points 소수→v1 제외), 새 inject hook(주입 4번째 회피),
+  run 명령 자동검증(셸로 결정론 검증 불가 — 출처 포인터로 완화).
+
+---
+
+## 2-G. 온보딩 (기존 repo 한 방 설정)
+
+진행 중 프로젝트엔 `.claude/`가 텅 비어 harness가 하나도 안 켜짐 → 코드+문서 훑어 세트를 한 번에 생성.
+
+### ✅ #14 `/wook-onboard` — 기존 repo 온보딩 (오케스트레이터)
+- **하는 일:** 네 개를 순서대로 생성 — ① `project-map.md`(=wook-map, 토대) → ② `evaluate.recipe`
+  (map의 run.test/lint/build에서 **베이스라인 derive** = 유일 신규 로직) → ③ `conventions/<domain>.md`
+  (=wook-conventions brownfield) → ④ `reuse-index/<domain>.md`(=wook-index).
+- **거의 오케스트레이터:** 기존 3스킬 스키마를 *재사용*(재구현 X). 통째 스캔은 읽기전용 → 읽기전용
+  sub-agent fan-out 허용(서로 다른 파일=충돌 없음, 쓰기는 Step3에서 본인이).
+- **가드:** **제안→승인→작성**(대량+recipe가 게이트 ON → 자동 대량작성 ✗), 멱등(기존 파일 갱신/스킵, 안 덮음).
+- **파일:** `~/.claude/skills/wook-onboard/SKILL.md`. 빌트인 `/init`(CLAUDE.md)과 별개(보완).
+- **검증:** selfcheck exit 0(frontmatter). 오케스트레이터=프롬프트라 동작은 라이브 호출로 검증(스킬 공통).
+
+---
+
 ## 3. 파일 인벤토리 (`~/.claude`)
 
 ```
@@ -187,18 +324,27 @@
 │  ├─ format_py.py                    # #1 자동 포맷
 │  ├─ inject_core_rules.py            # #2 망각 방지 주입
 │  ├─ inject_reuse_pointer.py         # #9 재사용 카탈로그 포인터
+│  ├─ inject_convention_pointer.py    # #11 컨벤션 포인터
 │  ├─ evaluate_gate.py                # #7 자동 게이트(Stop hook)
-│  └─ check_reuse_pointers.py         # #9 스테일 포인터 알림(Stop hook, 비차단)
+│  ├─ check_reuse_pointers.py         # #9 스테일 포인터 알림(Stop hook, 비차단)
+│  ├─ check_convention_pointers.py    # #11 컨벤션 스테일 알림(Stop hook, 비차단)
+│  └─ remind_evaluator.py             # #12 독립 평가자 리마인더(Stop hook, 비차단)
 ├─ harness/
 │  ├─ core-rules.md                   # 주입되는 규칙(편집 대상)
 │  ├─ core-rules.README.md            # 규칙 작성 가이드
-│  └─ evaluate.recipe.example         # 검증 레시피 템플릿(프로젝트로 복사)
+│  ├─ evaluate.recipe.example         # 검증 레시피 템플릿(프로젝트로 복사)
+│  ├─ conventions.frontend.example    # #11 frontend 컨벤션 템플릿
+│  └─ project-map.example             # #13 프로젝트 지도 템플릿(고정 스키마)
 ├─ agents/
 │  └─ wook-evaluator.md               # #5 독립 Evaluator 서브에이전트
 └─ skills/
    ├─ wook-evaluate/SKILL.md          # /wook-evaluate 진입점
    ├─ wook-plan/SKILL.md              # #8 /wook-plan (Planner)
-   └─ wook-index/SKILL.md             # #9 /wook-index (재사용 카탈로그 생성)
+   ├─ wook-brainstorm/SKILL.md        # #10 /wook-brainstorm (발산, PGE 앞단)
+   ├─ wook-index/SKILL.md             # #9 /wook-index (재사용 카탈로그 생성)
+   ├─ wook-conventions/SKILL.md       # #11 /wook-conventions (컨벤션 생성, bimodal)
+   ├─ wook-map/SKILL.md               # #13 /wook-map (프로젝트 지도 생성)
+   └─ wook-onboard/SKILL.md           # #14 /wook-onboard (기존 repo 한 방 온보딩)
 ```
 
 ---
@@ -215,13 +361,13 @@ my-claude-harness/                  # git repo (비밀 0, 단순 blacklist .giti
 ├─ CLAUDE.md                        # 이 repo 작업 시 컨벤션(build-log 갱신 등)
 ├─ docs/{claude-harness-design, build-log}.md
 ├─ claude/                          # ~/.claude 산출물의 source of truth
-│  ├─ hooks/{guard_paths, format_py, inject_core_rules, evaluate_gate}.py
-│  ├─ harness/{core-rules.md, core-rules.README.md, evaluate.recipe.example}
+│  ├─ hooks/{guard_paths, format_py, inject_core_rules, inject_reuse_pointer, inject_convention_pointer, evaluate_gate, check_reuse_pointers, check_convention_pointers, remind_evaluator}.py
+│  ├─ harness/{core-rules.md, core-rules.README.md, evaluate.recipe.example, conventions.frontend.example, project-map.example}
 │  ├─ agents/wook-evaluator.md       # #5 Evaluator 서브에이전트
-│  ├─ skills/{wook-evaluate, wook-plan}/SKILL.md  # 진입점
+│  ├─ skills/{wook-evaluate, wook-plan, wook-brainstorm, wook-index, wook-conventions, wook-map, wook-onboard}/SKILL.md  # 진입점
 │  └─ settings.hooks.json           # 우리가 소유한 hooks 블록({HOOKS_DIR} placeholder)
 ├─ deploy.py                        # claude/ -> ~/.claude 배포 (--check drift시 exit 1)
-├─ tools/selfcheck.py               # repo 자기검증(컴파일·settings·frontmatter·비밀)
+├─ tools/{selfcheck.py, test_conventions.py, test_evaluator.py, test_project_map.py}  # 자기검증 + #11·#12·#13 테스트
 ├─ .claude/{evaluate.recipe, plan.md}  # 이 repo 자신의 게이트 설정(자기검증 ON)
 └─ .gitignore
 ```

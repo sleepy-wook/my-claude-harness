@@ -1,6 +1,6 @@
 ---
 name: wook-index
-description: Build or refresh this project's reuse catalog — scan the code, group reusable components/functions/queries by domain, and write a compact per-domain manifest (.claude/reuse-index/<domain>.md) so future work reuses existing code instead of duplicating it. Use when asked to "index reusable code", "build the reuse catalog", "refresh the reuse index", or after adding shared utilities.
+description: Use to build or refresh this project's reuse catalog (`.claude/reuse-index/<domain>.md`). Triggers: "index reusable code", "build the reuse catalog", "refresh the reuse index"; after adding shared utilities/components/queries worth reusing. Not for onboarding a whole repo (use wook-onboard) or one-off edits.
 ---
 
 # /wook-index — build the reuse catalog
