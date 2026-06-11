@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="600" viewBox="0 0 980 600" font-family="'Segoe UI',Roboto,'Apple SD Gothic Neo','Malgun Gothic',sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5f6368"/>
+    </marker>
+  </defs>
+  <rect width="980" height="600" fill="#ffffff"/>
+
+  <!-- title -->
+  <text x="490" y="34" text-anchor="middle" font-size="23" font-weight="700" fill="#202124">claude-harness — PGE 루프 + 결정론 hooks</text>
+  <text x="490" y="56" text-anchor="middle" font-size="13" fill="#5f6368">모델 의지에 맡기지 않고 구조로 강제한다 · 판정을 실제 실행 결과(exit code)에 묶는다</text>
+
+  <!-- ===== Band 1: on-demand skills (PGE) ===== -->
+  <text x="40" y="92" font-size="14" font-weight="700" fill="#1a73e8">① 온디맨드 스킬 — 당신이 호출하는 PGE 루프</text>
+
+  <!-- boxes -->
+  <g>
+    <rect x="40" y="106" width="200" height="78" rx="9" fill="#e8f0fe" stroke="#1a73e8" stroke-width="1.5"/>
+    <text x="140" y="132" text-anchor="middle" font-size="15" font-weight="700" fill="#174ea6">Brainstorm</text>
+    <text x="140" y="151" text-anchor="middle" font-size="12.5" fill="#1a73e8">/wook-brainstorm</text>
+    <text x="140" y="170" text-anchor="middle" font-size="11.5" fill="#5f6368">발산 — 옵션 넓히기</text>
+
+    <rect x="273" y="106" width="200" height="78" rx="9" fill="#e8f0fe" stroke="#1a73e8" stroke-width="1.5"/>
+    <text x="373" y="132" text-anchor="middle" font-size="15" font-weight="700" fill="#174ea6">Plan</text>
+    <text x="373" y="151" text-anchor="middle" font-size="12.5" fill="#1a73e8">/wook-plan</text>
+    <text x="373" y="170" text-anchor="middle" font-size="11.5" fill="#5f6368">수용기준 → recipe</text>
+
+    <rect x="506" y="106" width="200" height="78" rx="9" fill="#e8f0fe" stroke="#1a73e8" stroke-width="1.5"/>
+    <text x="606" y="132" text-anchor="middle" font-size="15" font-weight="700" fill="#174ea6">Generate</text>
+    <text x="606" y="151" text-anchor="middle" font-size="12.5" fill="#5f6368">(구현 — 메인 작업)</text>
+    <text x="606" y="170" text-anchor="middle" font-size="11.5" fill="#5f6368">지식 읽고 코드 작성</text>
+
+    <rect x="739" y="106" width="200" height="78" rx="9" fill="#fce8e6" stroke="#d93025" stroke-width="1.5"/>
+    <text x="839" y="132" text-anchor="middle" font-size="15" font-weight="700" fill="#a50e0e">Evaluate</text>
+    <text x="839" y="151" text-anchor="middle" font-size="12.5" fill="#d93025">/wook-evaluate</text>
+    <text x="839" y="170" text-anchor="middle" font-size="11.5" fill="#5f6368">게이트 + 독립 평가자</text>
+  </g>
+
+  <!-- flow arrows -->
+  <path d="M240,145 L271,145" stroke="#5f6368" stroke-width="1.6" fill="none" marker-end="url(#arrow)"/>
+  <path d="M473,145 L504,145" stroke="#5f6368" stroke-width="1.6" fill="none" marker-end="url(#arrow)"/>
+  <path d="M706,145 L737,145" stroke="#5f6368" stroke-width="1.6" fill="none" marker-end="url(#arrow)"/>
+
+  <!-- loop back Evaluate -> Generate -->
+  <path d="M820,184 C800,232 560,232 542,186" stroke="#d93025" stroke-width="1.6" fill="none" stroke-dasharray="5,4" marker-end="url(#arrow)"/>
+  <text x="681" y="228" text-anchor="middle" font-size="11.5" fill="#d93025">미통과 → 계속 고침 (자동 루프)</text>
+
+  <!-- ===== Band 2: per-project knowledge ===== -->
+  <text x="40" y="280" font-size="14" font-weight="700" fill="#188038">② 프로젝트 지식 (.claude/ — AI가 만들고 유지)</text>
+
+  <g>
+    <rect x="40" y="294" width="200" height="62" rx="9" fill="#e6f4ea" stroke="#188038" stroke-width="1.5"/>
+    <text x="140" y="318" text-anchor="middle" font-size="13.5" font-weight="700" fill="#0d652d">project-map.md</text>
+    <text x="140" y="337" text-anchor="middle" font-size="11.5" fill="#5f6368">구조·스택·실행법</text>
+
+    <rect x="273" y="294" width="200" height="62" rx="9" fill="#e6f4ea" stroke="#188038" stroke-width="1.5"/>
+    <text x="373" y="318" text-anchor="middle" font-size="13.5" font-weight="700" fill="#0d652d">conventions/</text>
+    <text x="373" y="337" text-anchor="middle" font-size="11.5" fill="#5f6368">도메인 코딩 규칙</text>
+
+    <rect x="506" y="294" width="200" height="62" rx="9" fill="#e6f4ea" stroke="#188038" stroke-width="1.5"/>
+    <text x="606" y="318" text-anchor="middle" font-size="13.5" font-weight="700" fill="#0d652d">reuse-index/</text>
+    <text x="606" y="337" text-anchor="middle" font-size="11.5" fill="#5f6368">재사용 카탈로그</text>
+
+    <rect x="739" y="294" width="200" height="62" rx="9" fill="#e6f4ea" stroke="#188038" stroke-width="1.5"/>
+    <text x="839" y="318" text-anchor="middle" font-size="13.5" font-weight="700" fill="#0d652d">evaluate.recipe</text>
+    <text x="839" y="337" text-anchor="middle" font-size="11.5" fill="#5f6368">검증 체크(exit code)</text>
+  </g>
+
+  <!-- read arrow up into Generate -->
+  <path d="M620,294 L620,186" stroke="#188038" stroke-width="1.6" fill="none" marker-end="url(#arrow)"/>
+  <text x="628" y="250" font-size="11.5" fill="#188038">읽음</text>
+
+  <text x="40" y="378" font-size="11.5" fill="#5f6368">↑ <tspan font-weight="700">/wook-onboard</tspan> 가 한 번에 생성 · <tspan font-weight="700">/wook-map·/wook-conventions·/wook-index</tspan> 가 개별 생성·갱신 · recipe 존재 = 게이트 자동 ON</text>
+
+  <!-- ===== Band 3: deterministic hooks ===== -->
+  <text x="40" y="416" font-size="14" font-weight="700" fill="#e37400">③ 결정론 hooks — 항상 켜짐, 모델이 못 건너뜀</text>
+  <rect x="40" y="428" width="899" height="92" rx="10" fill="#fef7e0" stroke="#f9ab00" stroke-width="1.5"/>
+
+  <g>
+    <rect x="56" y="444" width="206" height="60" rx="8" fill="#ffffff" stroke="#f9ab00" stroke-width="1.2"/>
+    <text x="159" y="466" text-anchor="middle" font-size="12.5" font-weight="700" fill="#b06000">UserPromptSubmit</text>
+    <text x="159" y="484" text-anchor="middle" font-size="11" fill="#5f6368">core-rules 재주입 +</text>
+    <text x="159" y="498" text-anchor="middle" font-size="11" fill="#5f6368">reuse·convention 포인터</text>
+
+    <rect x="277" y="444" width="206" height="60" rx="8" fill="#ffffff" stroke="#f9ab00" stroke-width="1.2"/>
+    <text x="380" y="466" text-anchor="middle" font-size="12.5" font-weight="700" fill="#b06000">PreToolUse</text>
+    <text x="380" y="487" text-anchor="middle" font-size="11" fill="#5f6368">보호경로 deny</text>
+    <text x="380" y="500" text-anchor="middle" font-size="10.5" fill="#9aa0a6">.git · 키 · 시크릿</text>
+
+    <rect x="498" y="444" width="206" height="60" rx="8" fill="#ffffff" stroke="#f9ab00" stroke-width="1.2"/>
+    <text x="601" y="466" text-anchor="middle" font-size="12.5" font-weight="700" fill="#b06000">PostToolUse</text>
+    <text x="601" y="487" text-anchor="middle" font-size="11" fill="#5f6368">ruff 자동 포맷</text>
+
+    <rect x="719" y="444" width="204" height="60" rx="8" fill="#ffffff" stroke="#f9ab00" stroke-width="1.2"/>
+    <text x="821" y="466" text-anchor="middle" font-size="12.5" font-weight="700" fill="#b06000">Stop</text>
+    <text x="821" y="484" text-anchor="middle" font-size="11" fill="#5f6368">검증 게이트 + 스테일</text>
+    <text x="821" y="498" text-anchor="middle" font-size="11" fill="#5f6368">알림 + 평가자 리마인더</text>
+  </g>
+
+  <!-- footer -->
+  <text x="490" y="556" text-anchor="middle" font-size="12" fill="#5f6368">9 hooks · 7 skills · 1 독립 평가자(wook-evaluator + Playwright MCP) · <tspan font-weight="700" fill="#202124">deploy.py</tspan> 로 ~/.claude 에 배포</text>
+  <text x="490" y="578" text-anchor="middle" font-size="11.5" fill="#9aa0a6">독립 평가자 = 코드 쓴 컨텍스트가 자기 코드를 채점 못 하게 분리 · 프론트는 Playwright MCP로 실제 화면 검증</text>
+</svg>
