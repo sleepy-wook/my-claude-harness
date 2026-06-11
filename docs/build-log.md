@@ -78,6 +78,8 @@
 | 2026-06-11 | #15 멀티에이전트 = **deploy --target(v1)**, 디렉터리 재구조(v2) 보류 | 리서치: Codex가 hooks/skills/MCP를 Claude와 거의 동일 스키마로 미러 → 어댑터 얇음. 한 소스 읽어 도구별 렌더(스크립트 공유). v2 core/adapters 재구조는 cosmetic+위험↑라 보류. Codex 실동작은 머신 검증(컨테이너 불가) |
 | 2026-06-11 | Codex 지식파일 = **`.codex/`**(deploy가 `.claude`→`.codex` 치환) | 초기 decision A('`.claude` 공유') → **폐기**. Codex 프로젝트에 `.claude/`가 생기는 건 틀림(형욱 지적). 모든 codex 배포 텍스트에 `.claude`→`.codex` 적용, 배포본에 `.claude` 0 확인 |
 | 2026-06-11 | Windows(cp949) UnicodeDecodeError 수정 + selfcheck encoding 가드 | `read_text/write_text`가 로케일 기본 인코딩 써서 UTF-8 한글 소스 못 읽고 죽음. 모든 텍스트 I/O에 `encoding="utf-8"`, 가드가 누락 정적 차단(가드가 실제 1건 추가 적발) |
+| 2026-06-11 | deploy.py claude 실배포 크래시 수정(`write_bytes` 인자 누락) | copy_tree transform=None 분기가 bound method를 인자 없이 호출. `--check`만 돌린 CI가 놓침. text 분기처럼 lambda로 |
+| 2026-06-11 | 게이트가 레시피를 **bash로 실행**(Windows cmd.exe 탈출) | `shell=True`→Windows는 cmd.exe라 `!`·glob 등 POSIX 문법 깨짐(test_conventions 4b 적발). `bash -c`로(없으면 폴백). 하네스가 이미 Git Bash 가정. 4b 통과, 4스위트 green |
 
 ---
 

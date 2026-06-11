@@ -32,6 +32,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -119,11 +120,24 @@ def load_recipe(root: Path) -> list[tuple[str, str]] | None:
 
 
 def run(cmd, cwd: Path) -> tuple[int, str]:
-    """str => shell command; list => direct exec."""
-    shell = isinstance(cmd, str)
+    """list => direct exec; str => recipe command run through bash where available.
+
+    Recipe commands (str) run via `bash -c` so POSIX syntax (`!`, globs, pipes, grep)
+    behaves the same on every OS. On Windows `shell=True` would use cmd.exe — which the
+    harness never assumes (Claude Code itself runs hooks via Git Bash). Falls back to the
+    platform shell only if bash is not on PATH.
+    """
     try:
+        if isinstance(cmd, str):
+            bash = shutil.which("bash")
+            if bash:
+                argv, shell = [bash, "-c", cmd], False
+            else:
+                argv, shell = cmd, True
+        else:
+            argv, shell = cmd, False
         p = subprocess.run(
-            cmd, cwd=str(cwd), capture_output=True, text=True, timeout=280, shell=shell
+            argv, cwd=str(cwd), capture_output=True, text=True, timeout=280, shell=shell
         )
         return p.returncode, (p.stdout + p.stderr)
     except Exception as e:
