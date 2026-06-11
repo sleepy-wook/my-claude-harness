@@ -58,6 +58,7 @@
 | 2026-06-11 | main(재사용 카탈로그) ← 작업 브랜치 merge | 두 갈래(연구·brainstorm·게이트수정·CSO ↔ 재사용 카탈로그) 통합. core-rules 중복제거(우리 wook-plan 규칙을 main '하네스 워크플로' 섹션에 흡수), Brainstorm 섹션 #9→**#10** 재번호(재사용 카탈로그가 #9) |
 | 2026-06-11 | #11 컨벤션 시스템(도메인별 코딩 규칙/스타일) — 재사용 카탈로그의 형제 | 프로젝트별 `.claude/conventions/<domain>.md`, 값은 소스 포인터(안 낡음). 형제 hook 2개(포인터 주입+스테일 검사) — main `check_reuse_pointers` 안 건드림. 게이트 강제는 기존 Stop 게이트 재사용. frontend 슬라이스부터(over-build 회피). test_conventions 6/6 PASS |
 | 2026-06-11 | `/wook-conventions` = **bimodal**(greenfield 확정 / brownfield 추출) | 빈 프로젝트는 코딩 전 확정, 진행된 프로젝트는 도메인 코드만 훑어 초안+불일치 플래그 |
+| 2026-06-11 | `/wook-conventions` 안내를 **도메인 중립으로 일반화** | 기계장치는 처음부터 도메인 무관이나 스킬 *예시*가 frontend 편향 → "도메인별 무엇을 담는지" 힌트표(front/back/db/infra/data/shared)로 교체, greenfield/brownfield·문서예시 다도메인화. `.frontend.example`은 예시 1개로 유지 |
 
 ---
 

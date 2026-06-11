@@ -22,34 +22,51 @@ file, a config), referenced by a `path:symbol` pointer so detail never goes stal
    - **GREENFIELD** (no/empty domain code) → establish conventions FIRST, so coding follows them.
    - **BROWNFIELD** (domain code exists) → extract the de-facto conventions from the code.
 
+## What each domain typically covers (a prompt, not a schema — infer the real categories)
+
+- **frontend**: theme (light/dark), color tokens (primary/secondary/danger + hover/active/disabled), spacing scale, typography, component naming.
+- **backend**: API response shape, error/HTTP policy, layering (controller/service/repo), naming, validation, logging, pagination.
+- **db**: table/column naming, PK/FK conventions, timestamps, soft-delete, migration rules, indexes, enums.
+- **infra**: resource naming, tagging, module structure, secrets handling, environment promotion.
+- **data/ML**: pipeline/ETL structure, model/dataset naming, notebook conventions, analytics SQL.
+- **shared** (cross-cutting, applies to every task): testing, security/auth, logging/observability, error handling, git (commit/branch).
+
+Use this to know what to ASK (greenfield) or EXTRACT (brownfield) for the domain at hand. Other domains follow the same shape — adapt to the project.
+
 ## GREENFIELD — establish before coding
-1. Propose a starter, **one decision at a time** (multiple-choice where possible): theme
-   (light/dark), core color tokens (primary/secondary/danger + hover/active/disabled states),
-   spacing scale, typography, naming — only what this domain needs. Apply YAGNI.
-2. Note where the real source-of-truth SHOULD live (e.g. `src/theme/tokens.ts`). If it does
-   not exist yet, say so and flag that it must be created when coding starts (don't fake a pointer).
+1. Propose a starter set of conventions **for this domain** (use the per-domain categories
+   above), **one decision at a time** (multiple-choice where possible). Only what this domain
+   needs — apply YAGNI.
+2. Note where the real source-of-truth SHOULD live (e.g. a theme/tokens file for frontend, a
+   schema/migrations dir for db). If it does not exist yet, say so and flag that it must be
+   created when coding starts (don't fake a pointer).
 3. Get approval, then write the doc (below).
 
 ## BROWNFIELD — extract from existing code
-1. **Scan ONLY this domain's code** (frontend → frontend files only; ignore backend/db). Use
-   read-only search (grep/Glob, or an Explore subagent for breadth — read, never write).
-2. Pull out the de-facto conventions: colors/tokens actually used, component/naming patterns,
-   API response shapes, etc., and the real source files that hold them.
-3. **Flag inconsistencies** rather than silently picking (e.g. "3 different blues found:
-   #3B82F6, #2563EB, #1D4ED8 — choose the canonical one"). Let the developer decide.
+1. **Scan ONLY this domain's code** (frontend → frontend files only; backend → backend only;
+   ignore the rest). Use read-only search (grep/Glob, or an Explore subagent for breadth —
+   read, never write).
+2. Pull out the de-facto conventions for this domain (per the categories above) and the real
+   source files that hold them.
+3. **Flag inconsistencies** rather than silently picking (e.g. frontend: "3 different blues
+   found — choose the canonical one"; backend: "two error-response shapes in use — pick one";
+   db: "both `createdAt` and `created_at` exist"). Let the developer decide.
 4. Present the draft, get approval/edits, then write the doc.
 
 ## Write the doc — `.claude/conventions/<domain>.md`
-- **Rules / guidance** (judgment): prose the AI should follow (e.g. "primary for main CTAs").
+- **Rules / guidance** (judgment): prose the AI should follow — e.g. frontend "primary for main
+  CTAs", backend "errors return `{error, code}`", db "every table has `created_at`/`updated_at`".
 - **Source pointers** (so values never go stale): compact lines, same form the stale-check
-  hook reads:
+  hook reads — `- <name> · <one-line> · <path>:<symbol>` (same for every domain):
   ```
-  - primary · 주요 CTA·강조, hover=명도 -8% · src/theme/tokens.ts:primary
+  - primary · main CTA, hover=-8% · src/theme/tokens.ts:primary      # frontend
+  - error-shape · all API errors · src/http/errors.ts:ApiError        # backend
   ```
   `<path>:<symbol>` must actually resolve — re-read to confirm (no stale pointers).
 - **Enforced rules**: for each machine-checkable rule, mark it `[강제: <check-name>]` in the
-  doc AND propose the matching command for `.claude/evaluate.recipe` (e.g.
-  `style: npx stylelint "**/*.{css,tsx}"` banning raw hex). The doc↔gate stay paired.
+  doc AND propose the matching command for `.claude/evaluate.recipe` — use whatever tool fits
+  the domain (frontend `style: npx stylelint …` banning raw hex; db `db-naming: python
+  scripts/check_naming.py`; backend an eslint/test check). The doc↔gate stay paired.
 - Create `.claude/conventions/` if missing — its presence turns the convention pointer on.
 
 ## Rules
