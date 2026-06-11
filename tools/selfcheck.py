@@ -71,6 +71,18 @@ try:
 except Exception as e:
     errors.append(f"secrets: {e}")
 
+# 5. build-log growth nudge (non-failing): tiered-log policy says archive when large.
+warnings: list[str] = []
+try:
+    n = len((REPO / "docs" / "build-log.md").read_text(encoding="utf-8").splitlines())
+    if n > 700:
+        warnings.append(
+            f"build-log.md is {n} lines (>700) — archive older feature sections to "
+            "docs/build-log-archive/ (keep decisions with status); see its 유지 정책."
+        )
+except Exception:
+    pass
+
 # Verdict.
 if errors:
     print("SELFCHECK FAIL:")
@@ -81,4 +93,6 @@ print(
     f"SELFCHECK OK: {len(scripts)} scripts compile, settings has 4 events, "
     f"{len(mds)} md frontmatter ok, no tracked secrets"
 )
+for w in warnings:
+    print("  ⚠ ", w)
 sys.exit(0)
