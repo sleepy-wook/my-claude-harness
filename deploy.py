@@ -32,8 +32,14 @@ SRC = REPO / "claude"  # tool-neutral source (name kept for git history)
 # ---- shared file ops -------------------------------------------------------
 
 
-def copy_tree(src_dir: Path, dest_dir: Path, check: bool, actions: list):
-    """Mirror src_dir into dest_dir (recursive, skipping bytecode)."""
+def copy_tree(
+    src_dir: Path, dest_dir: Path, check: bool, actions: list, transform=None
+):
+    """Mirror src_dir into dest_dir (recursive, skipping bytecode).
+
+    `transform`: if given, files are treated as UTF-8 text and rewritten through it
+    (used by the Codex target to rename the per-tool dir `.claude` -> `.codex`).
+    """
     if not src_dir.exists():
         return
     for f in sorted(src_dir.rglob("*")):
@@ -41,11 +47,25 @@ def copy_tree(src_dir: Path, dest_dir: Path, check: bool, actions: list):
             continue
         rel = f.relative_to(src_dir.parent)
         target = dest_dir.parent / rel
-        same = target.exists() and target.read_bytes() == f.read_bytes()
+        if transform is None:
+            new = f.read_bytes()
+            same = target.exists() and target.read_bytes() == new
+            writer = target.write_bytes
+        else:
+            new = transform(f.read_text(encoding="utf-8"))
+            same = target.exists() and target.read_text(encoding="utf-8") == new
+            writer = lambda data=new: target.write_text(data, encoding="utf-8")  # noqa: E731
         actions.append(("copy", rel.as_posix(), "up-to-date" if same else "update"))
         if not check and not same:
             target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(f, target)
+            writer()
+
+
+def codex_text(s: str) -> str:
+    """Rename the per-tool dir for Codex: `.claude` -> `.codex` (project artifacts
+    like `.claude/conventions` AND home paths like `~/.claude/cache`). `.claude`
+    always names a directory in our files; the product name "Claude Code" has no dot."""
+    return s.replace(".claude", ".codex")
 
 
 def write_rendered(dest: Path, content: str, name: str, check: bool, actions: list):
@@ -164,9 +184,10 @@ def deploy_codex(check: bool) -> list:
     dest = Path.home() / ".codex"
     hooks_dir = (dest / "hooks").as_posix()
     actions: list = []
-    # Shared, copied as-is: hook scripts, skills (same SKILL.md convention), templates.
+    # Shared scripts/skills/templates — copied with `.claude` -> `.codex` so the agent
+    # reads/writes the project's `.codex/` dir (conventions, reuse-index, recipe, map).
     for sub in ("hooks", "skills", "harness"):
-        copy_tree(SRC / sub, dest / sub, check, actions)
+        copy_tree(SRC / sub, dest / sub, check, actions, transform=codex_text)
     # Rendered per-tool: hooks registration, rules file, evaluator wrapper.
     write_rendered(
         dest / "hooks.json",
@@ -183,8 +204,10 @@ def deploy_codex(check: bool) -> list:
     )
     write_rendered(
         dest / "AGENTS.md",
-        build_agents_md(
-            (SRC / "harness" / "core-rules.md").read_text(encoding="utf-8")
+        codex_text(
+            build_agents_md(
+                (SRC / "harness" / "core-rules.md").read_text(encoding="utf-8")
+            )
         ),
         "AGENTS.md",
         check,
@@ -192,8 +215,10 @@ def deploy_codex(check: bool) -> list:
     )
     write_rendered(
         dest / "agents" / "wook-evaluator.toml",
-        build_evaluator_toml(
-            (SRC / "agents" / "wook-evaluator.md").read_text(encoding="utf-8")
+        codex_text(
+            build_evaluator_toml(
+                (SRC / "agents" / "wook-evaluator.md").read_text(encoding="utf-8")
+            )
         ),
         "agents/wook-evaluator.toml",
         check,
