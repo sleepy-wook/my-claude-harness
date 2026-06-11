@@ -138,3 +138,28 @@ deploy:    python deploy.py --check
 ## 산출물(추가)
 - `claude/harness/project-map.example`, `claude/skills/wook-map/SKILL.md`,
   `claude/agents/wook-evaluator.md`(수정), `claude/harness/core-rules.md`(수정), `tools/test_project_map.py`
+
+---
+
+# SPEC — `/wook-onboard`: 기존 repo 한 방 온보딩 (#14)
+
+> 2026-06-11 승인. 진행 중 프로젝트엔 `.claude/`가 텅 빔 → 코드+문서 훑어 harness 세트를
+> 한 번에 생성. 거의 오케스트레이터(기존 3스킬 로직 엮음) + 레시피 derive.
+
+## Scope — IN
+- `/wook-onboard` 스킬 1개. 네 개 전부 생성(승인): ① `project-map.md`(=wook-map) →
+  ② `evaluate.recipe`(map의 run.test/lint/build에서 **베이스라인 derive** = 유일 신규 로직) →
+  ③ `conventions/<domain>.md`(=wook-conventions brownfield) → ④ `reuse-index/<domain>.md`(=wook-index).
+- **제안→승인→작성**(대량+recipe가 게이트 ON이라 자동 대량작성 ✗). 멱등(기존 파일 덮지 말고 갱신/스킵).
+- 통째 스캔은 읽기전용 → (선택) 읽기전용 sub-agent fan-out 허용(서로 다른 파일=충돌 없음).
+
+## Scope — OUT
+- 새 hook/settings(스킬 하나뿐). 기존 스킬 로직 재구현(참조·재사용만).
+
+## Acceptance criteria
+1. `selfcheck` exit 0(`/wook-onboard` frontmatter 유효, CSO description).
+2. 스킬이 네 산출물·순서·승인게이트·멱등·recipe derive를 명시.
+- 한계: 오케스트레이터=프롬프트라 동작은 라이브 호출로만 검증(스킬 공통).
+
+## 산출물(추가)
+- `claude/skills/wook-onboard/SKILL.md`

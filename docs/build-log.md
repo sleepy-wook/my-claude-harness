@@ -63,6 +63,7 @@
 | 2026-06-11 | 평가자 호출 트리거 = **본인 판단 + 결정론 리마인더**(강제 차단 X) | "사소 vs 비사소"는 기계 판단 부적합(1줄도 클 수 있음) → 본인 판단. 단 "큰 변경에도 까먹음" 해결 위해 코드변경 턴에 비차단 알림. frontend 슬라이스부터(over-build 회피) |
 | 2026-06-11 | #13 프로젝트 지도 `.claude/project-map.md`(구조+스택+실행법, AI 자동유지) | 평가자가 "어떻게 띄우고 뭘 보나" 즉흥하던 빈 곳 메움. 형식=MD+YAML블록+ASCII tree(JSON 주석불가 ✗, 순수YAML 어색 ✗). **고정 섹션 스키마**(평가자가 어디 볼지 항상 앎) |
 | 2026-06-11 | project-map 설계를 **독립 리뷰어(타 에이전트)로 평가** 후 개정 | 제안자(나) 자기평가=편향 → 독립 평가가 run: 신뢰성·env 누락·recipe 중복 등 6개 실약점 적시. smoke→recipe 연결, env/services 추가, run 출처포인터, verified 스탬프 반영 |
+| 2026-06-11 | #14 `/wook-onboard` — 기존 repo 한 방 온보딩(오케스트레이터) | 진행중 프로젝트=`.claude` 텅 빔 → map+recipe+conventions+reuse-index 한 번에. 기존 3스킬 재사용+recipe derive만 신규. 제안→승인→작성(대량/게이트ON 가드), 멱등 |
 
 ---
 
@@ -296,6 +297,22 @@ LLM 평가자(서브에이전트)만 가능(결정론 셸 게이트는 브라우
 
 ---
 
+## 2-G. 온보딩 (기존 repo 한 방 설정)
+
+진행 중 프로젝트엔 `.claude/`가 텅 비어 harness가 하나도 안 켜짐 → 코드+문서 훑어 세트를 한 번에 생성.
+
+### ✅ #14 `/wook-onboard` — 기존 repo 온보딩 (오케스트레이터)
+- **하는 일:** 네 개를 순서대로 생성 — ① `project-map.md`(=wook-map, 토대) → ② `evaluate.recipe`
+  (map의 run.test/lint/build에서 **베이스라인 derive** = 유일 신규 로직) → ③ `conventions/<domain>.md`
+  (=wook-conventions brownfield) → ④ `reuse-index/<domain>.md`(=wook-index).
+- **거의 오케스트레이터:** 기존 3스킬 스키마를 *재사용*(재구현 X). 통째 스캔은 읽기전용 → 읽기전용
+  sub-agent fan-out 허용(서로 다른 파일=충돌 없음, 쓰기는 Step3에서 본인이).
+- **가드:** **제안→승인→작성**(대량+recipe가 게이트 ON → 자동 대량작성 ✗), 멱등(기존 파일 갱신/스킵, 안 덮음).
+- **파일:** `~/.claude/skills/wook-onboard/SKILL.md`. 빌트인 `/init`(CLAUDE.md)과 별개(보완).
+- **검증:** selfcheck exit 0(frontmatter). 오케스트레이터=프롬프트라 동작은 라이브 호출로 검증(스킬 공통).
+
+---
+
 ## 3. 파일 인벤토리 (`~/.claude`)
 
 ```
@@ -325,7 +342,8 @@ LLM 평가자(서브에이전트)만 가능(결정론 셸 게이트는 브라우
    ├─ wook-brainstorm/SKILL.md        # #10 /wook-brainstorm (발산, PGE 앞단)
    ├─ wook-index/SKILL.md             # #9 /wook-index (재사용 카탈로그 생성)
    ├─ wook-conventions/SKILL.md       # #11 /wook-conventions (컨벤션 생성, bimodal)
-   └─ wook-map/SKILL.md               # #13 /wook-map (프로젝트 지도 생성)
+   ├─ wook-map/SKILL.md               # #13 /wook-map (프로젝트 지도 생성)
+   └─ wook-onboard/SKILL.md           # #14 /wook-onboard (기존 repo 한 방 온보딩)
 ```
 
 ---
@@ -345,7 +363,7 @@ my-claude-harness/                  # git repo (비밀 0, 단순 blacklist .giti
 │  ├─ hooks/{guard_paths, format_py, inject_core_rules, inject_reuse_pointer, inject_convention_pointer, evaluate_gate, check_reuse_pointers, check_convention_pointers, remind_evaluator}.py
 │  ├─ harness/{core-rules.md, core-rules.README.md, evaluate.recipe.example, conventions.frontend.example, project-map.example}
 │  ├─ agents/wook-evaluator.md       # #5 Evaluator 서브에이전트
-│  ├─ skills/{wook-evaluate, wook-plan, wook-brainstorm, wook-index, wook-conventions, wook-map}/SKILL.md  # 진입점
+│  ├─ skills/{wook-evaluate, wook-plan, wook-brainstorm, wook-index, wook-conventions, wook-map, wook-onboard}/SKILL.md  # 진입점
 │  └─ settings.hooks.json           # 우리가 소유한 hooks 블록({HOOKS_DIR} placeholder)
 ├─ deploy.py                        # claude/ -> ~/.claude 배포 (--check drift시 exit 1)
 ├─ tools/{selfcheck.py, test_conventions.py, test_evaluator.py, test_project_map.py}  # 자기검증 + #11·#12·#13 테스트
