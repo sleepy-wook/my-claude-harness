@@ -163,3 +163,36 @@ deploy:    python deploy.py --check
 
 ## 산출물(추가)
 - `claude/skills/wook-onboard/SKILL.md`
+
+---
+
+# SPEC — 멀티 에이전트 리팩터 v1: Claude Code + Codex (#15)
+
+> 2026-06-11 승인(A: `.claude/` 유지, B: AGENTS.md, C: custom agent .toml, v1=deploy --target).
+> 리서치: Codex가 hooks/skills/MCP를 Claude와 거의 동일 스키마로 미러 → 어댑터가 얇음.
+
+## 접근
+v1 = `deploy.py --target=claude|codex` (디렉터리 재구조 X). 한 소스(`claude/`)를 읽어 도구별 배포.
+- claude → `~/.claude` (settings.json hooks 병합) — 기존 그대로
+- codex → `~/.codex`: hooks 스크립트 + `hooks.json`(변환) + `skills/` + `AGENTS.md`(core-rules) + `agents/wook-evaluator.toml`
+
+## Scope — IN
+1. `deploy.py --target`(default claude=하위호환). codex 생성 로직은 **순수 함수**로(테스트 가능).
+2. hook 필드명 관용: `tool_input.file_path`(Claude) ↔ `path`(Codex) — guard_paths·format_py.
+3. `tools/test_codex_adapter.py`: 변환된 hooks.json 유효+4이벤트+스크립트경로, AGENTS.md 생성, evaluator.toml tomllib 파싱.
+4. README·build-log 갱신.
+
+## Scope — OUT
+core/adapters 재구조(v2) · 지식파일 중립화 · **Codex 실동작 라이브검증(머신)**.
+
+## Acceptance criteria
+1. `deploy.py --target=claude --check` 무회귀 + 기존 테스트(conventions 6, evaluator 6, project_map 11) 그대로.
+2. `deploy.py --target=codex --check` → 산출 나열 + 생성될 hooks.json 유효 JSON·4이벤트 포함.
+3. `test_codex_adapter.py`: 변환 동등성·AGENTS.md·evaluator.toml 검증.
+4. 필드명 관용 단위 테스트(file_path/path 둘 다).
+5. selfcheck exit 0.
+- 한계: Codex `apply_patch` hook 실발동·정확한 command 스키마는 컨테이너서 검증 불가 → 머신 테스트 항목.
+
+## 산출물
+- `deploy.py`(수정), `claude/hooks/{guard_paths,format_py}.py`(필드 관용),
+  `tools/test_codex_adapter.py`, README·build-log.

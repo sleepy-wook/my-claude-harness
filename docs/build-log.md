@@ -75,6 +75,7 @@
 | 2026-06-11 | #14 `/wook-onboard` — 기존 repo 한 방 온보딩(오케스트레이터) | 진행중 프로젝트=`.claude` 텅 빔 → map+recipe+conventions+reuse-index 한 번에. 기존 3스킬 재사용+recipe derive만 신규. 제안→승인→작성(대량/게이트ON 가드), 멱등 |
 | 2026-06-11 | 스킬 전수 **독립 감사**(타 에이전트) → 트리거 충돌·CSO 정리 | 죽은/중복 스킬 0(자를것·합칠것 없음). 단 `"onboard this repo"`가 map/conventions/onboard 3곳에 걸린 충돌 발견 → map·conventions·index에서 온보딩 트리거 제거(onboard가 유일 front door), plan/index/map description CSO 정리 |
 | 2026-06-11 | build-log 무한성장 대책 = **계층화(C)** | 리서치 3각도 수렴: ADR supersede(status) + MemGPT식 아카이브(cold 이동, 삭제 X) + progressive disclosure(인덱스/최근만 읽기) + selfcheck 임계 트리거. B(풀 ADR 분할)는 우리 *서술+결정+스냅샷* 혼합엔 맥락 흩어지고 과설계 → C 채택 |
+| 2026-06-11 | #15 멀티에이전트 = **deploy --target(v1)**, 디렉터리 재구조(v2) 보류 | 리서치: Codex가 hooks/skills/MCP를 Claude와 거의 동일 스키마로 미러 → 어댑터 얇음. 한 소스 읽어 도구별 렌더(스크립트 공유). v2 core/adapters 재구조는 cosmetic+위험↑라 보류. Codex 실동작은 머신 검증(컨테이너 불가) |
 
 ---
 
@@ -324,6 +325,29 @@ LLM 평가자(서브에이전트)만 가능(결정론 셸 게이트는 브라우
 
 ---
 
+## 2-H. 멀티 에이전트 — Codex 어댑터 (v1)
+
+리서치 결과 Codex가 hooks/skills/MCP를 **Claude와 거의 동일 스키마로 미러**(hooks GA v0.124.0) → 어댑터가
+얇음. "한 소스 + 도구별 배포"로 확장(디렉터리 재구조 없이 v1).
+
+### ✅ #15 `deploy.py --target=claude|codex` — Codex 지원 (v1)
+- **접근:** `claude/` 한 소스를 읽어 도구별 렌더. claude=`~/.claude`(settings.json hooks)·codex=`~/.codex`.
+  hook **스크립트는 공유**(stdin JSON 스키마 동일) — 다른 건 *등록 파일/규칙파일/평가자 래퍼*뿐.
+- **Codex 렌더(순수 함수, 테스트 가능):**
+  - `hooks.json` ← settings.hooks.json 변환(편집 matcher에 `apply_patch` 추가, command=단일 문자열)
+  - `AGENTS.md` ← core-rules(항상 로드=망각방지 등가). `agents/wook-evaluator.toml` ← 평가자(.md→.toml, sandbox read-only + Playwright MCP)
+  - hooks/skills/harness는 그대로 복사(SKILL.md 컨벤션 동일).
+- **필드명 관용:** hook 스크립트가 `tool_input.file_path`(Claude)·`path`(Codex) 둘 다 읽음(guard_paths·format_py).
+- **결정(승인):** A 지식파일 `.claude/` 유지 · B core-rules→AGENTS.md · C 평가자=custom agent `.toml` · v1=deploy --target(재구조 X, v2 보류).
+- **검증(`tools/test_codex_adapter.py` 12/12):** 변환 hooks.json 유효·4이벤트·apply_patch·스크립트 보존,
+  AGENTS.md H1제거+규칙, evaluator.toml tomllib 파싱, 필드 관용(file_path/path). 회귀 6/6·6/6·11/11, selfcheck exit 0.
+  실제 렌더 확인(~/.codex/{hooks.json,AGENTS.md,agents/wook-evaluator.toml}).
+- **⚠️ 한계(정직):** Codex `apply_patch` hook 실발동·정확한 command/agent.toml 스키마는 **이 컨테이너서 검증 불가**
+  → 형욱님 머신(Codex 설치)에서 테스트해야 함. OpenAI 문서 403로 일부 스니펫 검증.
+- **OUT:** core/adapters 디렉터리 재구조(v2) · 지식파일 중립화 · `codex exec` 강격리 평가자.
+
+---
+
 ## 3. 파일 인벤토리 (`~/.claude`)
 
 ```
@@ -377,7 +401,8 @@ my-claude-harness/                  # git repo (비밀 0, 단순 blacklist .giti
 │  ├─ skills/{wook-evaluate, wook-plan, wook-brainstorm, wook-index, wook-conventions, wook-map, wook-onboard}/SKILL.md  # 진입점
 │  └─ settings.hooks.json           # 우리가 소유한 hooks 블록({HOOKS_DIR} placeholder)
 ├─ deploy.py                        # claude/ -> ~/.claude 배포 (--check drift시 exit 1)
-├─ tools/{selfcheck.py, test_conventions.py, test_evaluator.py, test_project_map.py}  # 자기검증 + #11·#12·#13 테스트
+├─ tools/{selfcheck.py, test_conventions.py, test_evaluator.py, test_project_map.py, test_codex_adapter.py}  # 자기검증 + #11~#13·#15 테스트
+├─ deploy.py                        # claude/ → ~/.claude|~/.codex 멱등 배포 (--target)
 ├─ .claude/{evaluate.recipe, plan.md}  # 이 repo 자신의 게이트 설정(자기검증 ON)
 └─ .gitignore
 ```

@@ -60,7 +60,7 @@ def main() -> int:
         return 0  # can't parse -> stay out of the way
 
     tool_input = event.get("tool_input") or {}
-    file_path = tool_input.get("file_path")
+    file_path = tool_input.get("file_path") or tool_input.get("path")  # Claude / Codex
     if not file_path:
         return 0
 
