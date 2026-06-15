@@ -79,7 +79,8 @@
 | 2026-06-11 | Codex 지식파일 = **`.codex/`**(deploy가 `.claude`→`.codex` 치환) | 초기 decision A('`.claude` 공유') → **폐기**. Codex 프로젝트에 `.claude/`가 생기는 건 틀림(형욱 지적). 모든 codex 배포 텍스트에 `.claude`→`.codex` 적용, 배포본에 `.claude` 0 확인 |
 | 2026-06-11 | Windows(cp949) UnicodeDecodeError 수정 + selfcheck encoding 가드 | `read_text/write_text`가 로케일 기본 인코딩 써서 UTF-8 한글 소스 못 읽고 죽음. 모든 텍스트 I/O에 `encoding="utf-8"`, 가드가 누락 정적 차단(가드가 실제 1건 추가 적발) |
 | 2026-06-15 | #7 게이트 트리거 = **코드 내용 시그니처(`code_sig`)**, `verified_head`/dirty-tree 폐기 | 형욱 피드백: 미커밋 코드가 남아 있으면 *사소한 질문에도* 매 턴 레시피 재실행. 트리거를 "dirty 여부"→"마지막 통과 이후 코드 내용이 실제로 바뀌었나"로. test_gate 7/7 · → **대체됨**(2026-06-15 #16 커밋 게이트 — Stop 게이트 자체를 폐기) |
-| 2026-06-15 | deploy `copy_tree` 실쓰기 버그 수정(`write_bytes()` 인자 누락) | codex 리팩터 때 들어간 버그: bytes 경로가 `writer()`를 인자 없이 호출해 *파일이 실제 변경될 때만* 크래시(–check는 안 써서 못 잡음). 라이브 게이트가 적발. 회귀 테스트 추가(copy_tree 양 경로 실쓰기) → codex_adapter 18/18 |
+| 2026-06-15 | deploy `copy_tree` 실쓰기 버그 수정(`write_bytes()` 인자 누락) | bytes 분기가 bound method를 인자 없이 호출 → *파일 실제 변경 시만* 크래시(`--check`만 돈 게이트가 놓침). 양 경로 직접 write로. (main에서도 병렬 수정 → 머지 시 통합, 회귀 테스트 추가) |
+| 2026-06-15 | 게이트가 레시피를 **bash로 실행**(Windows cmd.exe 탈출) | `shell=True`→Windows는 cmd.exe라 `!`·glob 등 POSIX 문법 깨짐(test_conventions 4b 적발). `bash -c`로(없으면 폴백). 하네스가 이미 Git Bash 가정. **커밋 게이트(`gate_on_commit`)에 이식** |
 | 2026-06-15 | `/wook-plan`이 recipe를 **누적 금지·작고 빠른 set으로 수렴** | 형욱 발견: plan마다 recipe에 기능 기준이 *덧붙어* 무한 비대 → 게이트가 점점 느려짐(1줄 수정에도 무거운 더미 실행). 수정: 스킬이 기준을 *테스트로* 표현(표준 `pytest` 줄이 커버), recipe엔 표준 빠른 검사만, 느린/시각 검사는 `/wook-evaluate`로, 쓸 때 cruft prune. "merge로 쌓기" 폐기 |
 | 2026-06-15 | #16 **자동 게이트 = Stop(매 턴) → 커밋 게이트(PreToolUse `git commit`)** | 형욱: 결정론 게이트가 *매 턴/자잘한 수정*마다 발동해 너무 잦음(off 끄고 싶을 정도). 줄 수 기준 엄격화는 구멍(1줄 버그 놓침)이라 ✗ → 발동 *granularity*를 커밋(의도적 "한 단위")으로. `gate_on_commit.py`가 `git commit` 가로채 recipe 실행, 실패면 deny(`--no-verify`로 우회). Stop `evaluate_gate.py`+`verified_head`/`code_sig` 전부 **폐기**(삭제). test_gate_on_commit 6/6 |
 

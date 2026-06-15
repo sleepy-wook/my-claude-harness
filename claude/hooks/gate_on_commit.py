@@ -14,6 +14,7 @@ Any error => allow (never trap the dev). `--no-verify` is the explicit escape ha
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -51,9 +52,13 @@ def load_recipe(root: Path):
 
 
 def run(cmd: str, cwd: Path):
+    """Run a recipe command via bash where available so POSIX syntax (`!`, globs,
+    pipes) behaves the same on every OS; on Windows `shell=True` would use cmd.exe."""
     try:
+        bash = shutil.which("bash")
+        argv, shell = ([bash, "-c", cmd], False) if bash else (cmd, True)
         p = subprocess.run(
-            cmd, cwd=str(cwd), capture_output=True, text=True, timeout=280, shell=True
+            argv, cwd=str(cwd), capture_output=True, text=True, timeout=280, shell=shell
         )
         return p.returncode, (p.stdout + p.stderr)
     except Exception as e:
