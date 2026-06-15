@@ -15,10 +15,12 @@ exit codes). This kills the "claimed done without running the checks" failure mo
 Activation (all must hold, else it allows the stop cheaply):
 1. `.claude/evaluate-off` does NOT exist (project root or an ancestor).
 2. `.claude/evaluate.recipe` exists (its presence = gate active here).
-3. There is something to verify: uncommitted code files, OR the commit (HEAD) has
-   advanced past the last commit we verified (so committing inside a turn can't slip
-   past the gate). non-git => always verify. The first stop in a fresh git project
-   verifies the current HEAD once, then stays quiet on clean, unchanged checkouts.
+3. The CODE changed since the last pass — by content signature (`code_sig`: HEAD +
+   the current content of changed/untracked code files). A plain question or a
+   doc-only edit leaves the signature unchanged => SKIP (no recipe, no waiting),
+   even while the tree is dirty. A real edit (committed or not) flips it => run.
+   non-git => always verify. This is what keeps trivial turns from re-running the
+   recipe; committing inside a turn is still caught (HEAD is part of the signature).
 
 Runaway/oscillation guard (§0-4): normalized failure signature; same signature
 STALL_LIMIT times in a row => give up (stuck); a changing failure resets stuck but
@@ -130,39 +132,33 @@ def run(cmd, cwd: Path) -> tuple[int, str]:
         return 0, f"(could not run {cmd}: {e})"  # non-blocking
 
 
-def dirty_code(root: Path) -> bool | None:
-    """True: uncommitted code files present. False: clean git tree. None: not a git repo."""
-    _, out = run(["git", "status", "--porcelain"], root)
-    if "fatal:" in out or out.startswith("(could not run"):
-        return None  # not a git repo (or git unavailable)
-    for line in out.splitlines():
-        path = line[3:].strip().strip('"')
-        if Path(path).suffix.lower() in CODE_EXT:
-            return True
-    return False
-
-
-def head(root: Path) -> str | None:
-    """Current commit SHA, or None if not a git repo."""
-    rc, out = run(["git", "rev-parse", "HEAD"], root)
-    out = out.strip()
-    return out if rc == 0 and out and "fatal:" not in out else None
-
-
-def needs_eval(root: Path, verified_head: str | None) -> bool:
-    """Is there anything to verify on this stop?
-
-    Uncommitted code => yes. Otherwise, on a clean git tree, yes only if HEAD has
-    moved past the commit we last verified (catches edit→commit→stop in one turn).
-    Non-git checkouts can't be tracked by commit, so they always verify.
-    """
-    dc = dirty_code(root)
-    if dc is None:
-        return True  # not git => can't track commits, verify every time (as before)
-    if dc:
-        return True  # uncommitted code changes
-    h = head(root)  # clean tree: did the commit advance past the last verified one?
-    return h is not None and h != verified_head
+def code_sig(root: Path) -> str | None:
+    """Signature of the project's CODE state: committed HEAD + the current content of
+    every changed/untracked code file. It changes only when code actually changes — so
+    a plain question (no edit) skips the gate even while the tree is dirty, and a real
+    edit (committed or not) triggers it. None => not a git repo (then: always verify)."""
+    rc, h = run(["git", "rev-parse", "HEAD"], root)
+    h = h.strip()
+    if rc != 0 or "fatal:" in h or h.startswith("(could not run"):
+        return None
+    _, tracked = run(["git", "diff", "HEAD", "--name-only"], root)
+    _, untracked = run(["git", "ls-files", "--others", "--exclude-standard"], root)
+    files = sorted(
+        {
+            ln.strip()
+            for ln in (tracked + "\n" + untracked).splitlines()
+            if ln.strip() and Path(ln.strip()).suffix.lower() in CODE_EXT
+        }
+    )
+    parts = [h]
+    for f in files:
+        try:
+            parts.append(
+                f + "\x00" + (root / f).read_text(encoding="utf-8", errors="replace")
+            )
+        except Exception:
+            parts.append(f + "\x00<gone>")
+    return hashlib.sha1("\x00".join(parts).encode("utf-8", "replace")).hexdigest()[:16]
 
 
 def signature(text: str) -> str:
@@ -182,10 +178,10 @@ def state_path(root: Path) -> Path:
 def read_state(root: Path) -> dict:
     try:
         st = json.loads(state_path(root).read_text(encoding="utf-8"))
-        st.setdefault("verified_head", None)
+        st.setdefault("verified_sig", None)
         return st
     except Exception:
-        return {"attempts": 0, "sig": None, "stuck": 0, "verified_head": None}
+        return {"attempts": 0, "sig": None, "stuck": 0, "verified_sig": None}
 
 
 def write_state(root: Path, st: dict) -> None:
@@ -196,11 +192,12 @@ def write_state(root: Path, st: dict) -> None:
         pass
 
 
-def reset_episode(root: Path, verified_head: str | None) -> None:
-    """Clear the retry/stuck counters for a new episode, but KEEP verified_head
-    (which records the last commit that passed, so it must survive across episodes)."""
+def reset_episode(root: Path, verified_sig: str | None) -> None:
+    """Clear the retry/stuck counters for a new episode, but KEEP verified_sig
+    (the code signature that last PASSED, so it survives across episodes and stops
+    unchanged turns from re-running the recipe)."""
     write_state(
-        root, {"attempts": 0, "sig": None, "stuck": 0, "verified_head": verified_head}
+        root, {"attempts": 0, "sig": None, "stuck": 0, "verified_sig": verified_sig}
     )
 
 
@@ -224,14 +221,18 @@ def main() -> int:
         return allow()  # no recipe => gate not active in this project
 
     st = read_state(root)
-    verified_head = st.get("verified_head")
+    verified_sig = st.get("verified_sig")
+    sig_now = code_sig(root)
 
-    if not needs_eval(root, verified_head):
-        reset_episode(root, verified_head)  # nothing to verify; keep verified_head
+    # Run only when the CODE changed since the last pass. A plain question or a
+    # doc-only edit leaves sig_now == verified_sig => skip (no recipe, no waiting),
+    # even if the tree is dirty. Non-git (sig_now is None) => always verify.
+    if sig_now is not None and sig_now == verified_sig:
+        reset_episode(root, verified_sig)  # nothing changed; keep the passed sig
         return allow()
 
     if not event.get("stop_hook_active"):
-        reset_episode(root, verified_head)  # fresh episode; keep verified_head
+        reset_episode(root, verified_sig)  # fresh episode; keep verified_sig
 
     failures = []
     for name, cmd in checks:
@@ -240,9 +241,8 @@ def main() -> int:
             failures.append((name, cmd, out))
 
     if not failures:
-        # Passed: record the commit we just verified so a clean tree at this HEAD
-        # won't re-trigger, but a later commit will.
-        reset_episode(root, head(root))
+        # Passed: record this code signature so unchanged turns won't re-run.
+        reset_episode(root, sig_now)
         return allow()
 
     combined = "\n\n".join(f"[{n}] {c}\n{o}" for n, c, o in failures)
@@ -255,25 +255,27 @@ def main() -> int:
     stuck = st.get("stuck", 0) + 1 if sig == st.get("sig") else 1
 
     if stuck >= STALL_LIMIT:
-        reset_episode(root, verified_head)
+        reset_episode(root, verified_sig)
         return give_up(
             f"⚠️ auto-evaluate gate: stuck on the SAME failing result {stuck}x in a "
             f"row (no progress) — [{failed}]. Stopping the auto-loop; your turn.\n\n{tail}"
         )
     if attempts >= MAX_ATTEMPTS:
-        reset_episode(root, verified_head)
+        reset_episode(root, verified_sig)
         return give_up(
             f"⚠️ auto-evaluate gate: {MAX_ATTEMPTS} attempts without passing "
             f"[{failed}] — not converging. Stopping the auto-loop; your turn.\n\n{tail}"
         )
 
+    # Failing: keep verified_sig UNCHANGED (do not record this broken state) so the
+    # next turn still re-checks — but the attempt/stuck caps bound the loop.
     write_state(
         root,
         {
             "attempts": attempts,
             "sig": sig,
             "stuck": stuck,
-            "verified_head": verified_head,
+            "verified_sig": verified_sig,
         },
     )
     progress = "same failure" if stuck > 1 else "new failure"
