@@ -21,7 +21,7 @@
 | 대화가 길어지면 초반 지침을 잊음 | 매 프롬프트마다 핵심 규칙 재주입 | hook `inject_core_rules` |
 | 시키지 않은 걸 멋대로 함 / 보호 파일 편집 | `.git`·키·시크릿 Edit/Write 차단 | hook `guard_paths` |
 | 스타일을 안 지킴 | 편집 직후 자동 포맷 | hook `format_py` |
-| "테스트 안 돌리고 됐다고 함" | 턴 끝에 **실제 검증**, 통과 전엔 '완료' 차단 | PGE 게이트 `evaluate_gate` |
+| "테스트 안 돌리고 됐다고 함" | **커밋 시 실제 검증**, 통과 전엔 커밋 차단 | 커밋 게이트 `gate_on_commit` |
 | 본인이 자기 코드를 후하게 평가 | **독립** 평가자가 도메인 맞는 방식으로 실제 검증 | `wook-evaluate` + `wook-evaluator` |
 | 기존 코드 중복 생성 / 규칙 안 지킴 | 프로젝트 지식(.claude/)을 읽고 재사용·준수 | `wook-index` / `wook-conventions` |
 | 매번 "어떻게 띄우지?" 재발견 | 구조·스택·실행법을 지도로 유지 | `wook-map` |
@@ -83,7 +83,7 @@ python deploy.py --target=codex     # ~/.codex 로: hooks.json·skills/·AGENTS.
 
 <a id="wook-plan"></a>
 ### `/wook-plan` — 코드 전에 "완료"를 정의
-- **무엇:** 짧은 요청을 *실행 가능한 수용 기준* 스펙으로 확장하고, 그 기준을 `.claude/evaluate.recipe`로 박는다. **레시피가 생기는 순간 자동 게이트가 켜진다.**
+- **무엇:** 짧은 요청을 *실행 가능한 수용 기준* 스펙으로 확장하고, 그 기준을 `.claude/evaluate.recipe`로 박는다(작고 빠른 set로 유지). **레시피가 있으면 커밋 게이트가 `git commit` 때 그 기준으로 검증한다.**
 - **언제:** 중간 규모 이상 기능 시작 전. "plan this", "수용 기준 정의".
 - **어떻게:** `/wook-plan <기능>` → (모호하면 질문) → SPEC(범위/엣지/수용기준) 제시 → recipe 제안 → 승인 → `.claude/{evaluate.recipe, plan.md}` 작성 → 구현. 기준은 *머신이 실제로 돌릴 수 있는 것*만(테스트 통과, exit 0, 200 응답…).
 - **산출물:** `.claude/evaluate.recipe`, `.claude/plan.md`.
@@ -156,14 +156,14 @@ hook은 생명주기 특정 시점에 **반드시** 실행되는 스크립트다
 | `UserPromptSubmit` | 컨벤션 포인터 주입 | `inject_convention_pointer.py` |
 | `PreToolUse` (Edit\|Write) | 보호 경로 deny(.git·키·시크릿) | `guard_paths.py` |
 | `PostToolUse` (Edit\|Write) | `.py` 자동 포맷(ruff) | `format_py.py` |
-| `Stop` | 자동 검증 게이트(recipe 실행) | `evaluate_gate.py` |
+| `PreToolUse` (Bash) | 커밋 게이트 — `git commit` 시 recipe 검증, 실패면 deny | `gate_on_commit.py` |
 | `Stop` | 재사용 스테일 포인터 알림 | `check_reuse_pointers.py` |
 | `Stop` | 컨벤션 스테일 포인터 알림 | `check_convention_pointers.py` |
 | `Stop` | "독립 평가자 돌려" 리마인더 | `remind_evaluator.py` |
 
-모든 스크립트는 문제가 생겨도 작업을 막지 않도록 안전하게 빠진다. 차단은 **의도된 곳**(보호 경로 deny,
-검증 미통과)에서만. 자동 게이트는 정체 감지·최대 시도·새 stop 리셋으로 무한루프를 막고, **커밋만 하고
-끝내는 우회**도 막는다(마지막 통과 커밋 추적).
+모든 스크립트는 문제가 생겨도 작업을 막지 않도록 안전하게 빠진다. 차단은 **의도된 곳**에서만 — 보호 경로 deny,
+그리고 **커밋 게이트**(`git commit` 시 recipe 미통과면 커밋 deny; `--no-verify`로 우회). 검증은 매 턴이 아니라
+**커밋(한 단위 완료) 시점**에만 돌아 자잘한 수정·질문엔 발동하지 않는다.
 
 - core-rules 편집: `~/.claude/harness/core-rules.md`(다음 프롬프트부터 반영). repo 관리는 `claude/harness/core-rules.md` 고치고 `python deploy.py`.
 

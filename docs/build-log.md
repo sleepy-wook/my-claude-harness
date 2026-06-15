@@ -78,9 +78,10 @@
 | 2026-06-11 | #15 멀티에이전트 = **deploy --target(v1)**, 디렉터리 재구조(v2) 보류 | 리서치: Codex가 hooks/skills/MCP를 Claude와 거의 동일 스키마로 미러 → 어댑터 얇음. 한 소스 읽어 도구별 렌더(스크립트 공유). v2 core/adapters 재구조는 cosmetic+위험↑라 보류. Codex 실동작은 머신 검증(컨테이너 불가) |
 | 2026-06-11 | Codex 지식파일 = **`.codex/`**(deploy가 `.claude`→`.codex` 치환) | 초기 decision A('`.claude` 공유') → **폐기**. Codex 프로젝트에 `.claude/`가 생기는 건 틀림(형욱 지적). 모든 codex 배포 텍스트에 `.claude`→`.codex` 적용, 배포본에 `.claude` 0 확인 |
 | 2026-06-11 | Windows(cp949) UnicodeDecodeError 수정 + selfcheck encoding 가드 | `read_text/write_text`가 로케일 기본 인코딩 써서 UTF-8 한글 소스 못 읽고 죽음. 모든 텍스트 I/O에 `encoding="utf-8"`, 가드가 누락 정적 차단(가드가 실제 1건 추가 적발) |
-| 2026-06-15 | #7 게이트 트리거 = **코드 내용 시그니처(`code_sig`)**, `verified_head`/dirty-tree 폐기 | 형욱 피드백: 미커밋 코드가 남아 있으면 *사소한 질문에도* 매 턴 레시피 재실행. 트리거를 "dirty 여부"→"마지막 통과 이후 코드 내용이 실제로 바뀌었나"로. 질문·문서수정엔 스킵, 코드 변경 시만 실행. 커밋 우회는 여전히 차단(HEAD가 시그니처에 포함). test_gate 7/7(C2 스킵 실증) |
+| 2026-06-15 | #7 게이트 트리거 = **코드 내용 시그니처(`code_sig`)**, `verified_head`/dirty-tree 폐기 | 형욱 피드백: 미커밋 코드가 남아 있으면 *사소한 질문에도* 매 턴 레시피 재실행. 트리거를 "dirty 여부"→"마지막 통과 이후 코드 내용이 실제로 바뀌었나"로. test_gate 7/7 · → **대체됨**(2026-06-15 #16 커밋 게이트 — Stop 게이트 자체를 폐기) |
 | 2026-06-15 | deploy `copy_tree` 실쓰기 버그 수정(`write_bytes()` 인자 누락) | codex 리팩터 때 들어간 버그: bytes 경로가 `writer()`를 인자 없이 호출해 *파일이 실제 변경될 때만* 크래시(–check는 안 써서 못 잡음). 라이브 게이트가 적발. 회귀 테스트 추가(copy_tree 양 경로 실쓰기) → codex_adapter 18/18 |
 | 2026-06-15 | `/wook-plan`이 recipe를 **누적 금지·작고 빠른 set으로 수렴** | 형욱 발견: plan마다 recipe에 기능 기준이 *덧붙어* 무한 비대 → 게이트가 점점 느려짐(1줄 수정에도 무거운 더미 실행). 수정: 스킬이 기준을 *테스트로* 표현(표준 `pytest` 줄이 커버), recipe엔 표준 빠른 검사만, 느린/시각 검사는 `/wook-evaluate`로, 쓸 때 cruft prune. "merge로 쌓기" 폐기 |
+| 2026-06-15 | #16 **자동 게이트 = Stop(매 턴) → 커밋 게이트(PreToolUse `git commit`)** | 형욱: 결정론 게이트가 *매 턴/자잘한 수정*마다 발동해 너무 잦음(off 끄고 싶을 정도). 줄 수 기준 엄격화는 구멍(1줄 버그 놓침)이라 ✗ → 발동 *granularity*를 커밋(의도적 "한 단위")으로. `gate_on_commit.py`가 `git commit` 가로채 recipe 실행, 실패면 deny(`--no-verify`로 우회). Stop `evaluate_gate.py`+`verified_head`/`code_sig` 전부 **폐기**(삭제). test_gate_on_commit 6/6 |
 
 ---
 
@@ -147,7 +148,8 @@
 - **⚠️ 활성화:** 서브에이전트는 세션 시작 시 로드 → **재시작/새 세션부터 디스패치 가능**(스킬은 즉시 등록).
 - **다음:** 백엔드/프론트/DB 레시피 추가(#6).
 
-### ✅ #7 자동 게이트 — Stop hook (generate → 자동 evaluate 루프)
+### ⛔ #7 자동 게이트 — Stop hook  → **대체됨: #16 커밋 게이트(2026-06-15)**
+> Stop(매 턴) 발동이 너무 잦아 폐기. recipe 검증은 이제 `git commit` 시점에만(아래 #16). 이하 기록은 히스토리.
 - **목적:** 형욱이 원한 핵심 — **수동 `/wook-evaluate` 아니라 harness가 알아서**. 턴이 끝날 때
   자동으로 테스트를 돌려 미통과면 "완료"를 막고 자동으로 계속 작업. (§0-4 반복 루프)
 - **파일:** `~/.claude/hooks/evaluate_gate.py` (`type:"command"` Stop hook, exec form, timeout 300)
@@ -366,7 +368,7 @@ LLM 평가자(서브에이전트)만 가능(결정론 셸 게이트는 브라우
 │  ├─ inject_core_rules.py            # #2 망각 방지 주입
 │  ├─ inject_reuse_pointer.py         # #9 재사용 카탈로그 포인터
 │  ├─ inject_convention_pointer.py    # #11 컨벤션 포인터
-│  ├─ evaluate_gate.py                # #7 자동 게이트(Stop hook)
+│  ├─ gate_on_commit.py               # #16 커밋 게이트(PreToolUse, git commit 가로채기)
 │  ├─ check_reuse_pointers.py         # #9 스테일 포인터 알림(Stop hook, 비차단)
 │  ├─ check_convention_pointers.py    # #11 컨벤션 스테일 알림(Stop hook, 비차단)
 │  └─ remind_evaluator.py             # #12 독립 평가자 리마인더(Stop hook, 비차단)
@@ -402,13 +404,13 @@ my-claude-harness/                  # git repo (비밀 0, 단순 blacklist .giti
 ├─ CLAUDE.md                        # 이 repo 작업 시 컨벤션(build-log 갱신 등)
 ├─ docs/{claude-harness-design, build-log}.md
 ├─ claude/                          # ~/.claude 산출물의 source of truth
-│  ├─ hooks/{guard_paths, format_py, inject_core_rules, inject_reuse_pointer, inject_convention_pointer, evaluate_gate, check_reuse_pointers, check_convention_pointers, remind_evaluator}.py
+│  ├─ hooks/{guard_paths, format_py, inject_core_rules, inject_reuse_pointer, inject_convention_pointer, gate_on_commit, check_reuse_pointers, check_convention_pointers, remind_evaluator}.py
 │  ├─ harness/{core-rules.md, core-rules.README.md, evaluate.recipe.example, conventions.frontend.example, project-map.example}
 │  ├─ agents/wook-evaluator.md       # #5 Evaluator 서브에이전트
 │  ├─ skills/{wook-evaluate, wook-plan, wook-brainstorm, wook-index, wook-conventions, wook-map, wook-onboard}/SKILL.md  # 진입점
 │  └─ settings.hooks.json           # 우리가 소유한 hooks 블록({HOOKS_DIR} placeholder)
 ├─ deploy.py                        # claude/ -> ~/.claude 배포 (--check drift시 exit 1)
-├─ tools/{selfcheck.py, test_gate.py, test_conventions.py, test_evaluator.py, test_project_map.py, test_codex_adapter.py}  # 자기검증 + #7·#11~#13·#15 테스트
+├─ tools/{selfcheck.py, test_gate_on_commit.py, test_conventions.py, test_evaluator.py, test_project_map.py, test_codex_adapter.py}  # 자기검증 + #16·#11~#13·#15 테스트
 ├─ deploy.py                        # claude/ → ~/.claude|~/.codex 멱등 배포 (--target)
 ├─ .claude/{evaluate.recipe, plan.md}  # 이 repo 자신의 게이트 설정(자기검증 ON)
 └─ .gitignore
