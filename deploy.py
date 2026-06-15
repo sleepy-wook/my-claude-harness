@@ -50,15 +50,16 @@ def copy_tree(
         if transform is None:
             new = f.read_bytes()
             same = target.exists() and target.read_bytes() == new
-            writer = lambda data=new: target.write_bytes(data)  # noqa: E731
         else:
             new = transform(f.read_text(encoding="utf-8"))
             same = target.exists() and target.read_text(encoding="utf-8") == new
-            writer = lambda data=new: target.write_text(data, encoding="utf-8")  # noqa: E731
         actions.append(("copy", rel.as_posix(), "up-to-date" if same else "update"))
         if not check and not same:
             target.parent.mkdir(parents=True, exist_ok=True)
-            writer()
+            if transform is None:
+                target.write_bytes(new)
+            else:
+                target.write_text(new, encoding="utf-8")
 
 
 def codex_text(s: str) -> str:

@@ -12,6 +12,18 @@
             "statusMessage": "path guard"
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": ["{HOOKS_DIR}/gate_on_commit.py"],
+            "timeout": 300,
+            "statusMessage": "commit gate"
+          }
+        ]
       }
     ],
     "PostToolUse": [
@@ -58,13 +70,6 @@
     "Stop": [
       {
         "hooks": [
-          {
-            "type": "command",
-            "command": "python",
-            "args": ["{HOOKS_DIR}/evaluate_gate.py"],
-            "timeout": 300,
-            "statusMessage": "auto-evaluate gate"
-          },
           {
             "type": "command",
             "command": "python",

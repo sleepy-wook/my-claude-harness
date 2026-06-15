@@ -15,8 +15,7 @@ from pathlib import Path
 HOOKS = Path(__file__).resolve().parent.parent / "claude" / "hooks"
 INJECT = str(HOOKS / "inject_convention_pointer.py")
 CHECK = str(HOOKS / "check_convention_pointers.py")
-GATE = str(HOOKS / "evaluate_gate.py")
-STATE_DIR = Path.home() / ".claude" / "cache" / "eval_gate"
+GATE = str(HOOKS / "gate_on_commit.py")
 
 results = []
 
@@ -44,13 +43,12 @@ def conv_dir(d):
 
 
 def gate_decision(d):
-    rc, out = run(GATE, d, {"stop_hook_active": False})
+    # The convention's machine-checkable rule is enforced at COMMIT time now.
+    rc, out = run(GATE, d, {"tool_input": {"command": 'git commit -m "x"'}})
     if not out:
         return "allow"
-    obj = json.loads(out)
-    if obj.get("decision") == "block":
-        return "block"
-    return "giveup" if "systemMessage" in obj else "allow"
+    decision = json.loads(out)["hookSpecificOutput"]["permissionDecision"]
+    return "block" if decision == "deny" else "allow"
 
 
 print("Test 2 — pointer inject hook")
@@ -93,10 +91,8 @@ check(
 rc, out = run(CHECK, d)
 check("3b all valid: no output", out == "", True)
 
-print("Test 4 — convention rule enforced by the gate")
-if STATE_DIR.exists():
-    shutil.rmtree(STATE_DIR)
-d = tempfile.mkdtemp(prefix="conv_")  # non-git: gate always evaluates
+print("Test 4 — convention rule enforced by the commit gate")
+d = tempfile.mkdtemp(prefix="conv_")  # recipe checked when committing
 (Path(d) / ".claude").mkdir()
 (Path(d) / ".claude" / "evaluate.recipe").write_text(
     "style: ! grep -q RAWHEX app.tsx\n"
@@ -113,8 +109,6 @@ check("4b compliant -> allow", gate_decision(d), "allow")
 
 for d in Path(tempfile.gettempdir()).glob("conv_*"):
     shutil.rmtree(d, ignore_errors=True)
-if STATE_DIR.exists():
-    shutil.rmtree(STATE_DIR, ignore_errors=True)
 
 print(f"\nRESULT: {sum(results)}/{len(results)} passed")
 sys.exit(0 if all(results) else 1)

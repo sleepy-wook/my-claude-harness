@@ -60,7 +60,7 @@
 | 2026-06-02 | core-rules 4번째 규칙 추가(신규 구현 요청 시 `/wook-plan` 제안) | 매 프롬프트 주입되는 규칙으로 PGE Plan 단계를 자연 유도 — 게이트 default-ON(레시피 존재=ON)과 맞물림. (이후 merge에서 main '하네스 워크플로' 섹션에 흡수) |
 | 2026-06-02 | `/wook-brainstorm` 신설(PGE 앞단 발산), plan과 별도 스킬로 분리 | plan=수렴(recipe), brainstorm=발산 — 본질이 달라 분리 가치 有. 크기/도메인별 분할은 호출 결정비용만 키워 회피(plan 내부 흡수) |
 | 2026-06-02 | sub-agent를 PGE 너머 *읽기 전용 전문가 풀*로 확장하는 방향 합의 | "쓰기=메인 단일 스레드, 읽기/판정=sub-agent"(§0-3). evaluator가 1번 멤버, brainstorm fan-out이 응용. 대량 신설 대신 필요 시 1개씩(over-build 회피) |
-| 2026-06-02 | #7 게이트 커밋 우회 구멍 메움(`verified_head` 추적) | 턴 안 커밋→stop이 테스트 0회로 통과하던 실제 우회로 차단. SessionStart hook 신설 대신 evaluate_gate.py 자체에서 해결(표면 최소화). 7/7 시나리오 테스트 통과 |
+| 2026-06-02 | #7 게이트 커밋 우회 구멍 메움(`verified_head` 추적) | 턴 안 커밋→stop이 테스트 0회로 통과하던 실제 우회로 차단. SessionStart hook 신설 대신 evaluate_gate.py 자체에서 해결(표면 최소화). 7/7 시나리오 테스트 통과 · → **대체됨**(2026-06-15 `verified_sig` 내용 시그니처) |
 | 2026-06-02 | 스킬/에이전트 `description`에 **CSO 규칙** 적용(트리거 조건만, 워크플로 요약 제거) | superpowers 차용. description이 워크플로를 담으면 모델이 본문을 안 읽고 지름길 탐 → 트리거만 남겨 호출 신뢰성↑. 신규 스킬도 이 규칙 따름 |
 | 2026-06-02 | 신규 skill/agent 추가는 보류(빌트인과 중복 회피) | 코드리뷰=`/code-review`·탐색=`Explore`·리서치=`/deep-research`로 이미 커버. 유일 공백은 디버깅 규율 스킬(선택). over-build 회피(core-rules #1) |
 | 2026-06-09 | #9 재사용 카탈로그: **도메인별 2단계(매니페스트+실제소스), Skill.md 미사용** | Snowflake/Databricks 패턴. 포인터 hook(주입)+`/wook-index`(생성). 실제소스=상세라 안 낡음 |
@@ -78,8 +78,11 @@
 | 2026-06-11 | #15 멀티에이전트 = **deploy --target(v1)**, 디렉터리 재구조(v2) 보류 | 리서치: Codex가 hooks/skills/MCP를 Claude와 거의 동일 스키마로 미러 → 어댑터 얇음. 한 소스 읽어 도구별 렌더(스크립트 공유). v2 core/adapters 재구조는 cosmetic+위험↑라 보류. Codex 실동작은 머신 검증(컨테이너 불가) |
 | 2026-06-11 | Codex 지식파일 = **`.codex/`**(deploy가 `.claude`→`.codex` 치환) | 초기 decision A('`.claude` 공유') → **폐기**. Codex 프로젝트에 `.claude/`가 생기는 건 틀림(형욱 지적). 모든 codex 배포 텍스트에 `.claude`→`.codex` 적용, 배포본에 `.claude` 0 확인 |
 | 2026-06-11 | Windows(cp949) UnicodeDecodeError 수정 + selfcheck encoding 가드 | `read_text/write_text`가 로케일 기본 인코딩 써서 UTF-8 한글 소스 못 읽고 죽음. 모든 텍스트 I/O에 `encoding="utf-8"`, 가드가 누락 정적 차단(가드가 실제 1건 추가 적발) |
-| 2026-06-11 | deploy.py claude 실배포 크래시 수정(`write_bytes` 인자 누락) | copy_tree transform=None 분기가 bound method를 인자 없이 호출. `--check`만 돌린 CI가 놓침. text 분기처럼 lambda로 |
-| 2026-06-11 | 게이트가 레시피를 **bash로 실행**(Windows cmd.exe 탈출) | `shell=True`→Windows는 cmd.exe라 `!`·glob 등 POSIX 문법 깨짐(test_conventions 4b 적발). `bash -c`로(없으면 폴백). 하네스가 이미 Git Bash 가정. 4b 통과, 4스위트 green |
+| 2026-06-15 | #7 게이트 트리거 = **코드 내용 시그니처(`code_sig`)**, `verified_head`/dirty-tree 폐기 | 형욱 피드백: 미커밋 코드가 남아 있으면 *사소한 질문에도* 매 턴 레시피 재실행. 트리거를 "dirty 여부"→"마지막 통과 이후 코드 내용이 실제로 바뀌었나"로. test_gate 7/7 · → **대체됨**(2026-06-15 #16 커밋 게이트 — Stop 게이트 자체를 폐기) |
+| 2026-06-15 | deploy `copy_tree` 실쓰기 버그 수정(`write_bytes()` 인자 누락) | bytes 분기가 bound method를 인자 없이 호출 → *파일 실제 변경 시만* 크래시(`--check`만 돈 게이트가 놓침). 양 경로 직접 write로. (main에서도 병렬 수정 → 머지 시 통합, 회귀 테스트 추가) |
+| 2026-06-15 | 게이트가 레시피를 **bash로 실행**(Windows cmd.exe 탈출) | `shell=True`→Windows는 cmd.exe라 `!`·glob 등 POSIX 문법 깨짐(test_conventions 4b 적발). `bash -c`로(없으면 폴백). 하네스가 이미 Git Bash 가정. **커밋 게이트(`gate_on_commit`)에 이식** |
+| 2026-06-15 | `/wook-plan`이 recipe를 **누적 금지·작고 빠른 set으로 수렴** | 형욱 발견: plan마다 recipe에 기능 기준이 *덧붙어* 무한 비대 → 게이트가 점점 느려짐(1줄 수정에도 무거운 더미 실행). 수정: 스킬이 기준을 *테스트로* 표현(표준 `pytest` 줄이 커버), recipe엔 표준 빠른 검사만, 느린/시각 검사는 `/wook-evaluate`로, 쓸 때 cruft prune. "merge로 쌓기" 폐기 |
+| 2026-06-15 | #16 **자동 게이트 = Stop(매 턴) → 커밋 게이트(PreToolUse `git commit`)** | 형욱: 결정론 게이트가 *매 턴/자잘한 수정*마다 발동해 너무 잦음(off 끄고 싶을 정도). 줄 수 기준 엄격화는 구멍(1줄 버그 놓침)이라 ✗ → 발동 *granularity*를 커밋(의도적 "한 단위")으로. `gate_on_commit.py`가 `git commit` 가로채 recipe 실행, 실패면 deny(`--no-verify`로 우회). Stop `evaluate_gate.py`+`verified_head`/`code_sig` 전부 **폐기**(삭제). test_gate_on_commit 6/6 |
 
 ---
 
@@ -146,21 +149,23 @@
 - **⚠️ 활성화:** 서브에이전트는 세션 시작 시 로드 → **재시작/새 세션부터 디스패치 가능**(스킬은 즉시 등록).
 - **다음:** 백엔드/프론트/DB 레시피 추가(#6).
 
-### ✅ #7 자동 게이트 — Stop hook (generate → 자동 evaluate 루프)
+### ⛔ #7 자동 게이트 — Stop hook  → **대체됨: #16 커밋 게이트(2026-06-15)**
+> Stop(매 턴) 발동이 너무 잦아 폐기. recipe 검증은 이제 `git commit` 시점에만(아래 #16). 이하 기록은 히스토리.
 - **목적:** 형욱이 원한 핵심 — **수동 `/wook-evaluate` 아니라 harness가 알아서**. 턴이 끝날 때
   자동으로 테스트를 돌려 미통과면 "완료"를 막고 자동으로 계속 작업. (§0-4 반복 루프)
 - **파일:** `~/.claude/hooks/evaluate_gate.py` (`type:"command"` Stop hook, exec form, timeout 300)
 - **왜 command(스크립트)인가:** 매 턴 발동하니 **싸고 결정론적**이어야. LLM 안 씀. 판정은 실제
   exit code, 실패 시 테스트 출력 그대로 피드백. (깊은 분석은 `/wook-evaluate`의 LLM evaluator)
 - **발동 조건(default-ON by 레시피):** ① **`.claude/evaluate.recipe` 존재**(있으면 게이트 ON,
-  켜는 별도 단계 없음) ② **검증할 게 있음**(아래 ②-수정) ③ `.claude/evaluate-off` 없음. 아니면 즉시 통과
-  (거의 공짜) → 일반 대화·계획·레시피 없는 repo엔 영향 0. **"켜는 걸 깜빡" 시나리오 제거.**
-- **②-수정(2026-06-02, 커밋 우회 구멍 메움):** 기존엔 *미커밋 코드 변경*(git status)만 봤다 →
-  Claude가 **턴 안에서 커밋부터 하고 멈추면** 워킹트리가 깨끗 → 게이트가 그냥 통과(테스트 0회)하는
-  실제 우회로가 있었다. 수정: 상태에 **마지막으로 통과한 커밋(`verified_head`)**을 기록 → 워킹트리가
-  깨끗해도 **HEAD가 그 커밋에서 움직였으면(=세션 중 커밋됨) 다시 검증**. 미커밋 코드 변경 OR HEAD
-  전진 = 검증. 비-git은 종전대로 항상 검증. 깨끗·미변경(이미 통과한 HEAD)이면 조용히 통과(오발동 0).
-  새 git 프로젝트 첫 stop은 현재 HEAD를 1회 검증 후 기준점으로 기록.
+  켜는 별도 단계 없음) ② **마지막 통과 이후 코드가 실제로 바뀜**(아래 ②-트리거) ③ `.claude/evaluate-off`
+  없음. 아니면 즉시 통과(거의 공짜) → 일반 대화·계획·레시피 없는 repo엔 영향 0. **"켜는 걸 깜빡" 제거.**
+- **②-트리거: 코드 내용 시그니처(`code_sig`)** (2026-06-15, `verified_head`/dirty-tree 폐기):
+  - 문제(형욱): 트리거가 "워킹트리가 dirty한가"라, 미커밋 코드가 남아 있으면 **사소한 질문에도 매 턴
+    레시피 재실행** → 보류·지연.
+  - 수정: `code_sig` = HEAD + 변경/미추적 **코드 파일들의 현재 내용** 해시. *마지막으로 통과한 sig*와
+    같으면 **스킵**(레시피 0회). 질문·문서수정엔 안 돎, **코드를 진짜 바꿨을 때만** 실행.
+  - 커밋 우회(턴 안 커밋)는 여전히 차단(HEAD가 sig에 포함). 비-git은 항상 검증. 실패 시 sig 미기록 →
+    재검사하되 attempt/stuck cap이 루프 한정. 검증: `tools/test_gate.py` 7/7(C2 = 통과 후 코드 불변 → 스킵 실증).
 - **검증 레시피(유동적):** `.claude/evaluate.recipe`에 `name: 셸명령` 선언(어떤 stack/도메인이든) →
   게이트가 전부 실행, 미통과면 블로킹. 게이트는 레시피만 봄(무관 repo 안 건드림); 자동탐지 폴백은
   `/wook-evaluate`(온디맨드) 쪽. 템플릿: `~/.claude/harness/evaluate.recipe.example`
@@ -364,7 +369,7 @@ LLM 평가자(서브에이전트)만 가능(결정론 셸 게이트는 브라우
 │  ├─ inject_core_rules.py            # #2 망각 방지 주입
 │  ├─ inject_reuse_pointer.py         # #9 재사용 카탈로그 포인터
 │  ├─ inject_convention_pointer.py    # #11 컨벤션 포인터
-│  ├─ evaluate_gate.py                # #7 자동 게이트(Stop hook)
+│  ├─ gate_on_commit.py               # #16 커밋 게이트(PreToolUse, git commit 가로채기)
 │  ├─ check_reuse_pointers.py         # #9 스테일 포인터 알림(Stop hook, 비차단)
 │  ├─ check_convention_pointers.py    # #11 컨벤션 스테일 알림(Stop hook, 비차단)
 │  └─ remind_evaluator.py             # #12 독립 평가자 리마인더(Stop hook, 비차단)
@@ -400,13 +405,13 @@ my-claude-harness/                  # git repo (비밀 0, 단순 blacklist .giti
 ├─ CLAUDE.md                        # 이 repo 작업 시 컨벤션(build-log 갱신 등)
 ├─ docs/{claude-harness-design, build-log}.md
 ├─ claude/                          # ~/.claude 산출물의 source of truth
-│  ├─ hooks/{guard_paths, format_py, inject_core_rules, inject_reuse_pointer, inject_convention_pointer, evaluate_gate, check_reuse_pointers, check_convention_pointers, remind_evaluator}.py
+│  ├─ hooks/{guard_paths, format_py, inject_core_rules, inject_reuse_pointer, inject_convention_pointer, gate_on_commit, check_reuse_pointers, check_convention_pointers, remind_evaluator}.py
 │  ├─ harness/{core-rules.md, core-rules.README.md, evaluate.recipe.example, conventions.frontend.example, project-map.example}
 │  ├─ agents/wook-evaluator.md       # #5 Evaluator 서브에이전트
 │  ├─ skills/{wook-evaluate, wook-plan, wook-brainstorm, wook-index, wook-conventions, wook-map, wook-onboard}/SKILL.md  # 진입점
 │  └─ settings.hooks.json           # 우리가 소유한 hooks 블록({HOOKS_DIR} placeholder)
 ├─ deploy.py                        # claude/ -> ~/.claude 배포 (--check drift시 exit 1)
-├─ tools/{selfcheck.py, test_conventions.py, test_evaluator.py, test_project_map.py, test_codex_adapter.py}  # 자기검증 + #11~#13·#15 테스트
+├─ tools/{selfcheck.py, test_gate_on_commit.py, test_conventions.py, test_evaluator.py, test_project_map.py, test_codex_adapter.py}  # 자기검증 + #16·#11~#13·#15 테스트
 ├─ deploy.py                        # claude/ → ~/.claude|~/.codex 멱등 배포 (--target)
 ├─ .claude/{evaluate.recipe, plan.md}  # 이 repo 자신의 게이트 설정(자기검증 ON)
 └─ .gitignore
