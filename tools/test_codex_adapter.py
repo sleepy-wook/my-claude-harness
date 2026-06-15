@@ -92,6 +92,28 @@ check(
     ".codex/" in _agents_codex and ".claude/" not in _agents_codex,
 )
 
+print("Test — copy_tree actually writes (regression: write_bytes() missing data)")
+import shutil  # noqa: E402
+import tempfile  # noqa: E402
+
+_s = Path(tempfile.mkdtemp(prefix="ct_"))
+_d = Path(tempfile.mkdtemp(prefix="ct_"))
+(_s / "hooks").mkdir()
+(_s / "hooks" / "x.py").write_text(".claude/conventions\n", encoding="utf-8")
+deploy.copy_tree(_s / "hooks", _d / "hooks", False, [])  # bytes path (claude)
+check(
+    "bytes copy wrote the file",
+    (_d / "hooks" / "x.py").read_text(encoding="utf-8") == ".claude/conventions\n",
+)
+_d2 = Path(tempfile.mkdtemp(prefix="ct_"))
+deploy.copy_tree(_s / "hooks", _d2 / "hooks", False, [], transform=deploy.codex_text)
+check(
+    "transform copy wrote + renamed",
+    (_d2 / "hooks" / "x.py").read_text(encoding="utf-8") == ".codex/conventions\n",
+)
+for _p in (_s, _d, _d2):
+    shutil.rmtree(_p, ignore_errors=True)
+
 print("Test — evaluator.toml")
 ev = deploy.build_evaluator_toml(
     (REPO / "claude" / "agents" / "wook-evaluator.md").read_text(encoding="utf-8")
