@@ -25,18 +25,29 @@ Generator implements; Evaluator/gate enforce it.
      matches. Reject unverifiable criteria like "production-ready"; rewrite them into
      checkable ones ("`pytest tests/auth` passes", "`curl -sf /health` exits 0").
 
-3. **Translate criteria into a recipe.** Propose a concrete `.claude/evaluate.recipe`
-   (`name: shell command` per criterion). Show it. Any criterion that can't be automated:
-   mark **MANUAL** in the spec and state how the developer checks it (don't fake a command).
+3. **Wire criteria to verification — keep the gate recipe LEAN and FAST.** The auto-gate runs
+   `.claude/evaluate.recipe` on EVERY code-changing turn, so it must stay a *small, stable,
+   fast* set — **not** a per-feature pile that grows each plan.
+   - Prefer expressing each acceptance criterion as a **test** under the project's existing
+     runner (pytest/jest/…). The standing line (`tests: pytest -q`) then already covers it —
+     no new recipe line, and the recipe does not grow per feature.
+   - The recipe holds only the project's **standing fast checks** (tests, lint, typecheck).
+     Add a NEW line only for a genuinely new *category* of fast check, never per criterion.
+     **Do not accumulate** one-off commands.
+   - Route **slow or non-deterministic** checks (full e2e, build, integration, Playwright
+     visual) to on-demand `/wook-evaluate`, NOT the auto-gate. Mark **MANUAL** anything that
+     can't be automated (don't fake a command).
 
 4. **Get approval / edits** from the developer before writing anything.
 
 5. **On approval, write the artifacts:**
-   - Create or merge `.claude/evaluate.recipe` with the agreed checks. **Writing this file
-     turns the auto-gate ON for this project automatically** — there is no separate enable
-     step (recipe present = gate active on every code-changing turn). Tell the developer the
-     gate is now on, and that `.claude/evaluate-off` disables it if ever needed.
-   - Save the full spec to `.claude/plan.md` (so it survives context loss).
+   - Write `.claude/evaluate.recipe` as the **lean standing set** — do NOT blindly append to
+     what's already there; **prune** redundant/old/slow lines so the gate stays fast and the
+     recipe converges instead of growing. **Writing this file turns the auto-gate ON** (recipe
+     present = gate active on every code-changing turn; no separate enable). Tell the developer,
+     and that `.claude/evaluate-off` disables it.
+   - Save the full spec to `.claude/plan.md` (so it survives context loss). Feature-specific
+     criteria live there (and as tests) — not as extra recipe lines.
 
 6. **Hand off to implementation.** Build against the spec. Do NOT claim done until the
    recipe passes — the auto-gate (now on) runs exactly these checks on every turn-end and
@@ -48,5 +59,8 @@ Generator implements; Evaluator/gate enforce it.
 - Acceptance criteria must be **machine-checkable wherever possible** — that is the whole
   point; the Evaluator runs them. This is what makes "done" mean something here.
 - Keep scope tight and out-of-scope explicit.
-- The recipe you write is the contract. If the plan changes later, update the recipe in the
-  same breath so the gate never checks a stale bar.
+- The recipe is a **small, stable, fast** set the gate runs every turn — keep it *converging,
+  not growing*. Feature criteria become tests (covered by the standing line); slow/visual
+  checks go to `/wook-evaluate`, never the auto-gate. Prune accumulated cruft when you touch it.
+- The recipe you write is the contract. If the plan changes later, update it in the same breath
+  so the gate never checks a stale bar.

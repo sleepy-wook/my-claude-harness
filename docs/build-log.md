@@ -80,6 +80,7 @@
 | 2026-06-11 | Windows(cp949) UnicodeDecodeError 수정 + selfcheck encoding 가드 | `read_text/write_text`가 로케일 기본 인코딩 써서 UTF-8 한글 소스 못 읽고 죽음. 모든 텍스트 I/O에 `encoding="utf-8"`, 가드가 누락 정적 차단(가드가 실제 1건 추가 적발) |
 | 2026-06-15 | #7 게이트 트리거 = **코드 내용 시그니처(`code_sig`)**, `verified_head`/dirty-tree 폐기 | 형욱 피드백: 미커밋 코드가 남아 있으면 *사소한 질문에도* 매 턴 레시피 재실행. 트리거를 "dirty 여부"→"마지막 통과 이후 코드 내용이 실제로 바뀌었나"로. 질문·문서수정엔 스킵, 코드 변경 시만 실행. 커밋 우회는 여전히 차단(HEAD가 시그니처에 포함). test_gate 7/7(C2 스킵 실증) |
 | 2026-06-15 | deploy `copy_tree` 실쓰기 버그 수정(`write_bytes()` 인자 누락) | codex 리팩터 때 들어간 버그: bytes 경로가 `writer()`를 인자 없이 호출해 *파일이 실제 변경될 때만* 크래시(–check는 안 써서 못 잡음). 라이브 게이트가 적발. 회귀 테스트 추가(copy_tree 양 경로 실쓰기) → codex_adapter 18/18 |
+| 2026-06-15 | `/wook-plan`이 recipe를 **누적 금지·작고 빠른 set으로 수렴** | 형욱 발견: plan마다 recipe에 기능 기준이 *덧붙어* 무한 비대 → 게이트가 점점 느려짐(1줄 수정에도 무거운 더미 실행). 수정: 스킬이 기준을 *테스트로* 표현(표준 `pytest` 줄이 커버), recipe엔 표준 빠른 검사만, 느린/시각 검사는 `/wook-evaluate`로, 쓸 때 cruft prune. "merge로 쌓기" 폐기 |
 
 ---
 
