@@ -83,6 +83,7 @@
 | 2026-06-15 | 게이트가 레시피를 **bash로 실행**(Windows cmd.exe 탈출) | `shell=True`→Windows는 cmd.exe라 `!`·glob 등 POSIX 문법 깨짐(test_conventions 4b 적발). `bash -c`로(없으면 폴백). 하네스가 이미 Git Bash 가정. **커밋 게이트(`gate_on_commit`)에 이식** |
 | 2026-06-15 | `/wook-plan`이 recipe를 **누적 금지·작고 빠른 set으로 수렴** | 형욱 발견: plan마다 recipe에 기능 기준이 *덧붙어* 무한 비대 → 게이트가 점점 느려짐(1줄 수정에도 무거운 더미 실행). 수정: 스킬이 기준을 *테스트로* 표현(표준 `pytest` 줄이 커버), recipe엔 표준 빠른 검사만, 느린/시각 검사는 `/wook-evaluate`로, 쓸 때 cruft prune. "merge로 쌓기" 폐기 |
 | 2026-06-15 | #16 **자동 게이트 = Stop(매 턴) → 커밋 게이트(PreToolUse `git commit`)** | 형욱: 결정론 게이트가 *매 턴/자잘한 수정*마다 발동해 너무 잦음(off 끄고 싶을 정도). 줄 수 기준 엄격화는 구멍(1줄 버그 놓침)이라 ✗ → 발동 *granularity*를 커밋(의도적 "한 단위")으로. `gate_on_commit.py`가 `git commit` 가로채 recipe 실행, 실패면 deny(`--no-verify`로 우회). Stop `evaluate_gate.py`+`verified_head`/`code_sig` 전부 **폐기**(삭제). test_gate_on_commit 6/6 |
+| 2026-06-15 | `plan.md` 수명 = **현재 플랜만**(누적 X), 끝난 건 build-log | 형욱 발견: plan.md에 완료 SPEC이 계속 쌓임(recipe도 — 지난 수정으로 처리). plan.md는 *in-flight* 한 개만, `/wook-plan`이 **덮어쓰기**. 영구 기록은 build-log. 주기적/수동 정리 불필요(자동 수렴). 이 repo plan.md를 상시 자기검증 1개로 정리(완료 SPEC 6개 제거) |
 
 ---
 

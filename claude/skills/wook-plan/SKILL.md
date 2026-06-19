@@ -43,16 +43,18 @@ Generator implements; Evaluator/gate enforce it.
 5. **On approval, write the artifacts:**
    - Write `.claude/evaluate.recipe` as the **lean standing set** — do NOT blindly append to
      what's already there; **prune** redundant/old/slow lines so the gate stays fast and the
-     recipe converges instead of growing. **Writing this file turns the auto-gate ON** (recipe
-     present = gate active on every code-changing turn; no separate enable). Tell the developer,
-     and that `.claude/evaluate-off` disables it.
-   - Save the full spec to `.claude/plan.md` (so it survives context loss). Feature-specific
-     criteria live there (and as tests) — not as extra recipe lines.
+     recipe converges instead of growing. **Recipe present = the commit gate runs it on
+     `git commit`** (no separate enable). Tell the developer, and that `.claude/evaluate-off`
+     disables it.
+   - **Replace** `.claude/plan.md` with the CURRENT plan only — it holds the *in-flight* spec so
+     it survives context loss, NOT a history of finished plans. Overwrite the previous plan; the
+     permanent record of done work lives in `docs/build-log.md` (and the code/tests). Don't
+     accumulate completed specs here.
 
-6. **Hand off to implementation.** Build against the spec. Do NOT claim done until the
-   recipe passes — the auto-gate (now on) runs exactly these checks on every turn-end and
-   blocks "done" until they pass; `/wook-evaluate` gives a deeper on-demand verdict. Either
-   way the verdict is bound to real exit codes.
+6. **Hand off to implementation.** Build against the spec. Do NOT claim done until the recipe
+   passes — the **commit gate** runs exactly these checks on `git commit` and blocks the commit
+   until they pass; `/wook-evaluate` gives a deeper on-demand verdict. The verdict is bound to
+   real exit codes.
 
 ## Rules
 
