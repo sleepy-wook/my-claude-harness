@@ -84,6 +84,7 @@
 | 2026-06-15 | `/wook-plan`이 recipe를 **누적 금지·작고 빠른 set으로 수렴** | 형욱 발견: plan마다 recipe에 기능 기준이 *덧붙어* 무한 비대 → 게이트가 점점 느려짐(1줄 수정에도 무거운 더미 실행). 수정: 스킬이 기준을 *테스트로* 표현(표준 `pytest` 줄이 커버), recipe엔 표준 빠른 검사만, 느린/시각 검사는 `/wook-evaluate`로, 쓸 때 cruft prune. "merge로 쌓기" 폐기 |
 | 2026-06-15 | #16 **자동 게이트 = Stop(매 턴) → 커밋 게이트(PreToolUse `git commit`)** | 형욱: 결정론 게이트가 *매 턴/자잘한 수정*마다 발동해 너무 잦음(off 끄고 싶을 정도). 줄 수 기준 엄격화는 구멍(1줄 버그 놓침)이라 ✗ → 발동 *granularity*를 커밋(의도적 "한 단위")으로. `gate_on_commit.py`가 `git commit` 가로채 recipe 실행, 실패면 deny(`--no-verify`로 우회). Stop `evaluate_gate.py`+`verified_head`/`code_sig` 전부 **폐기**(삭제). test_gate_on_commit 6/6 |
 | 2026-06-15 | `plan.md` 수명 = **현재 플랜만**(누적 X), 끝난 건 build-log | 형욱 발견: plan.md에 완료 SPEC이 계속 쌓임(recipe도 — 지난 수정으로 처리). plan.md는 *in-flight* 한 개만, `/wook-plan`이 **덮어쓰기**. 영구 기록은 build-log. 주기적/수동 정리 불필요(자동 수렴). 이 repo plan.md를 상시 자기검증 1개로 정리(완료 SPEC 6개 제거) |
+| 2026-06-30 | 커밋 게이트가 **WSL bash를 거부**(Git Bash만 사용) | 형욱 발견: Windows에서 게이트가 매번 실패해 `--no-verify` 상시 사용. 원인 — WSL 깔린 Windows는 `shutil.which("bash")`가 `C:\Windows\System32\bash.exe`(=WSL 진입점)를 잡아 recipe를 리눅스 fs에서 실행(`python`·`C:\` 경로 부재)→전부 실패. `find_bash()`가 `%WINDIR%` 아래(WSL 스텁) 스킵하고 Git for Windows(PATH/표준경로/`git --exec-path`) 우선, 없으면 셸 폴백. Linux/Mac 무영향(`/usr/bin/bash` 그대로). test_gate_on_commit 7/7(G: System32 스텁 거부) |
 
 ---
 
