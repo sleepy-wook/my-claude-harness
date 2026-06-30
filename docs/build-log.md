@@ -84,6 +84,8 @@
 | 2026-06-15 | `/wook-plan`이 recipe를 **누적 금지·작고 빠른 set으로 수렴** | 형욱 발견: plan마다 recipe에 기능 기준이 *덧붙어* 무한 비대 → 게이트가 점점 느려짐(1줄 수정에도 무거운 더미 실행). 수정: 스킬이 기준을 *테스트로* 표현(표준 `pytest` 줄이 커버), recipe엔 표준 빠른 검사만, 느린/시각 검사는 `/wook-evaluate`로, 쓸 때 cruft prune. "merge로 쌓기" 폐기 |
 | 2026-06-15 | #16 **자동 게이트 = Stop(매 턴) → 커밋 게이트(PreToolUse `git commit`)** | 형욱: 결정론 게이트가 *매 턴/자잘한 수정*마다 발동해 너무 잦음(off 끄고 싶을 정도). 줄 수 기준 엄격화는 구멍(1줄 버그 놓침)이라 ✗ → 발동 *granularity*를 커밋(의도적 "한 단위")으로. `gate_on_commit.py`가 `git commit` 가로채 recipe 실행, 실패면 deny(`--no-verify`로 우회). Stop `evaluate_gate.py`+`verified_head`/`code_sig` 전부 **폐기**(삭제). test_gate_on_commit 6/6 |
 | 2026-06-15 | `plan.md` 수명 = **현재 플랜만**(누적 X), 끝난 건 build-log | 형욱 발견: plan.md에 완료 SPEC이 계속 쌓임(recipe도 — 지난 수정으로 처리). plan.md는 *in-flight* 한 개만, `/wook-plan`이 **덮어쓰기**. 영구 기록은 build-log. 주기적/수동 정리 불필요(자동 수렴). 이 repo plan.md를 상시 자기검증 1개로 정리(완료 SPEC 6개 제거) |
+| 2026-06-30 | 커밋 게이트가 **WSL bash를 거부**(Git Bash만 사용) | 형욱 발견: Windows에서 게이트가 매번 실패해 `--no-verify` 상시 사용. 원인 — WSL 깔린 Windows는 `shutil.which("bash")`가 `C:\Windows\System32\bash.exe`(=WSL 진입점)를 잡아 recipe를 리눅스 fs에서 실행(`python`·`C:\` 경로 부재)→전부 실패. `find_bash()`가 `%WINDIR%` 아래(WSL 스텁) 스킵하고 Git for Windows(PATH/표준경로/`git --exec-path`) 우선, 없으면 셸 폴백. Linux/Mac 무영향(`/usr/bin/bash` 그대로). test_gate_on_commit 7/7(G: System32 스텁 거부) |
+| 2026-06-30 | #17 `/wook-audit` — 전체 트리 **상시 감사 원장**(`.claude/audit/`) | 형욱 요청: 디렉토리 전체를 파일 하나하나 읽어 `.claude/audit/`에 살아있는 md 2개 유지 — `coverage.md`(트리+체크박스, ⬜→✅로 **재개** 장치) + `findings.md`(관찰된 규칙·스타일·문제 누적). 결정: **감사·기록만**(코드 안 고침)·**descriptive**(conventions=처방과 분리, 승격은 사람 몫)·대형 repo는 subagent fan-out+배치+남은 수 보고. onboard(one-shot 부트스트랩)·code-review(diff)와 구분. 닷푸드: 이 repo `tools/`(6파일) 실제 감사 → 원장 2개 생성, 발견 4건(check() 중복·시그니처 불일치, tools/ write_text encoding 누락 미가드, selfcheck Stop-gate stale 주석 등). selfcheck 9 md·deploy --check 0 |
 
 ---
 
@@ -389,7 +391,8 @@ LLM 평가자(서브에이전트)만 가능(결정론 셸 게이트는 브라우
    ├─ wook-index/SKILL.md             # #9 /wook-index (재사용 카탈로그 생성)
    ├─ wook-conventions/SKILL.md       # #11 /wook-conventions (컨벤션 생성, bimodal)
    ├─ wook-map/SKILL.md               # #13 /wook-map (프로젝트 지도 생성)
-   └─ wook-onboard/SKILL.md           # #14 /wook-onboard (기존 repo 한 방 온보딩)
+   ├─ wook-onboard/SKILL.md           # #14 /wook-onboard (기존 repo 한 방 온보딩)
+   └─ wook-audit/SKILL.md             # #17 /wook-audit (전체 트리 상시 감사 원장)
 ```
 
 ---
