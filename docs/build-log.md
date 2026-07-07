@@ -86,6 +86,8 @@
 | 2026-06-15 | `plan.md` 수명 = **현재 플랜만**(누적 X), 끝난 건 build-log | 형욱 발견: plan.md에 완료 SPEC이 계속 쌓임(recipe도 — 지난 수정으로 처리). plan.md는 *in-flight* 한 개만, `/wook-plan`이 **덮어쓰기**. 영구 기록은 build-log. 주기적/수동 정리 불필요(자동 수렴). 이 repo plan.md를 상시 자기검증 1개로 정리(완료 SPEC 6개 제거) |
 | 2026-06-30 | 커밋 게이트가 **WSL bash를 거부**(Git Bash만 사용) | 형욱 발견: Windows에서 게이트가 매번 실패해 `--no-verify` 상시 사용. 원인 — WSL 깔린 Windows는 `shutil.which("bash")`가 `C:\Windows\System32\bash.exe`(=WSL 진입점)를 잡아 recipe를 리눅스 fs에서 실행(`python`·`C:\` 경로 부재)→전부 실패. `find_bash()`가 `%WINDIR%` 아래(WSL 스텁) 스킵하고 Git for Windows(PATH/표준경로/`git --exec-path`) 우선, 없으면 셸 폴백. Linux/Mac 무영향(`/usr/bin/bash` 그대로). test_gate_on_commit 7/7(G: System32 스텁 거부) |
 | 2026-06-30 | #17 `/wook-audit` — 전체 트리 **상시 감사 원장**(`.claude/audit/`) | 형욱 요청: 디렉토리 전체를 파일 하나하나 읽어 `.claude/audit/`에 살아있는 md 2개 유지 — `coverage.md`(트리+체크박스, ⬜→✅로 **재개** 장치) + `findings.md`(관찰된 규칙·스타일·문제 누적). 결정: **감사·기록만**(코드 안 고침)·**descriptive**(conventions=처방과 분리, 승격은 사람 몫)·대형 repo는 subagent fan-out+배치+남은 수 보고. onboard(one-shot 부트스트랩)·code-review(diff)와 구분. 닷푸드: 이 repo `tools/`(6파일) 실제 감사 → 원장 2개 생성, 발견 4건(check() 중복·시그니처 불일치, tools/ write_text encoding 누락 미가드, selfcheck Stop-gate stale 주석 등). selfcheck 9 md·deploy --check 0 |
+| 2026-07-07 | 6~7월 트렌드 리서치 → **결론: 추가보다 절제**(우리 구조는 트렌드 정중앙) | deep-research fan-out(주장 75개·적대검증 33/35 생존). 신조어 계보 prompt→context→harness(Trivedy 3월, Böckeler 4/2 정식화)→**loop engineering**(6월 초). 핵심: 커밋-타임 결정론 게이트(Shankar, block-at-submit+비차단 hint) = 우리가 방금 한 것과 동일 / PGE 분리 Anthropic 지지 / 서브에이전트=컨텍스트 방화벽(역할 페르소나는 실패) / **Ratchet 원칙**(실패 뒤에만 규칙 추가, LLM생성 규칙은 성능 해침-ETH 2602.11988). 우리 하네스 평가 = 뒤처진 것 없음. **wook-reviewer 보류 재확인**(역할 서브에이전트 반패턴). 유일 저비용 추가후보 = 훅 메시지를 LLM자기교정형으로. 문서 미저장(형욱 토큰 절약 위해 채팅 합성으로 종료) |
+| 2026-07-07 | #18 `/wook-sandbox` — 격리 제작→써보고→**졸업** | 형욱 실제 통증("에이전트가 대충 만든 걸 실제 프로젝트에 바로 이식") 기반 = Ratchet 통과(투기 아님). **on-demand 스킬**(훅 아님→매 턴 비용 0)이라 과설계 위험 회피. `sandbox/<이름>/`(repo 루트, **gitignore**)에 그 조각만 목데이터로 제작→사람이 직접 써봄(프론트=dev서버+Playwright, 백=curl)→승인 시 실제 경로로 **이동(졸업)**+reuse-index 갱신→정상 evaluator/게이트. 프론트는 **프로젝트 실제 팔레트/토큰 import**(팔레트는 sandbox 소유 X, conventions 소유). plan/evaluator와 직교. selfcheck 10 md·deploy --check 0. 행동 닷푸드는 실제 FE/BE 프로젝트 몫(이 repo는 앱 아님) |
 
 ---
 
@@ -392,7 +394,8 @@ LLM 평가자(서브에이전트)만 가능(결정론 셸 게이트는 브라우
    ├─ wook-conventions/SKILL.md       # #11 /wook-conventions (컨벤션 생성, bimodal)
    ├─ wook-map/SKILL.md               # #13 /wook-map (프로젝트 지도 생성)
    ├─ wook-onboard/SKILL.md           # #14 /wook-onboard (기존 repo 한 방 온보딩)
-   └─ wook-audit/SKILL.md             # #17 /wook-audit (전체 트리 상시 감사 원장)
+   ├─ wook-audit/SKILL.md             # #17 /wook-audit (전체 트리 상시 감사 원장)
+   └─ wook-sandbox/SKILL.md           # #18 /wook-sandbox (격리 제작→써보고→졸업)
 ```
 
 ---
