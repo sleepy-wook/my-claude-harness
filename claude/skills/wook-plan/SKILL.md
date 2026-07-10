@@ -25,18 +25,22 @@ Generator implements; Evaluator/gate enforce it.
      matches. Reject unverifiable criteria like "production-ready"; rewrite them into
      checkable ones ("`pytest tests/auth` passes", "`curl -sf /health` exits 0").
 
-3. **Wire criteria to verification — keep the gate recipe LEAN and FAST.** The auto-gate runs
-   `.claude/evaluate.recipe` on EVERY code-changing turn, so it must stay a *small, stable,
-   fast* set — **not** a per-feature pile that grows each plan.
+3. **Wire criteria to verification — keep the gate recipe LEAN and FAST.** The commit gate runs
+   `.claude/evaluate.recipe` on **every `git commit`**, so it must stay a *small, stable, fast*
+   set — **not** a per-feature pile that grows each plan.
    - Prefer expressing each acceptance criterion as a **test** under the project's existing
      runner (pytest/jest/…). The standing line (`tests: pytest -q`) then already covers it —
      no new recipe line, and the recipe does not grow per feature.
    - The recipe holds only the project's **standing fast checks** (tests, lint, typecheck).
      Add a NEW line only for a genuinely new *category* of fast check, never per criterion.
      **Do not accumulate** one-off commands.
-   - Route **slow or non-deterministic** checks (full e2e, build, integration, Playwright
-     visual) to on-demand `/wook-evaluate`, NOT the auto-gate. Mark **MANUAL** anything that
-     can't be automated (don't fake a command).
+   - **Scope lint/format to CHANGED files, not the whole repo.** A trivial one-line commit must
+     not lint the entire tree. Prefer staged-file scoping, e.g.
+     `lint: git diff --cached --name-only --diff-filter=ACM | grep -E '\.(ts|tsx)$' | xargs -r npx eslint`
+     over a whole-repo glob (`eslint .` / `**/*`). Same for stylelint/prettier.
+   - Route **slow** checks (`build`, full e2e, integration, Playwright visual) to on-demand
+     `/wook-evaluate`, **NEVER the commit gate** — `build` in the gate makes every trivial commit
+     slow. Mark **MANUAL** anything that can't be automated (don't fake a command).
 
 4. **Get approval / edits** from the developer before writing anything.
 
