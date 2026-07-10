@@ -82,8 +82,15 @@
 | 2026-06-15 | deploy `copy_tree` 실쓰기 버그 수정(`write_bytes()` 인자 누락) | bytes 분기가 bound method를 인자 없이 호출 → *파일 실제 변경 시만* 크래시(`--check`만 돈 게이트가 놓침). 양 경로 직접 write로. (main에서도 병렬 수정 → 머지 시 통합, 회귀 테스트 추가) |
 | 2026-06-15 | 게이트가 레시피를 **bash로 실행**(Windows cmd.exe 탈출) | `shell=True`→Windows는 cmd.exe라 `!`·glob 등 POSIX 문법 깨짐(test_conventions 4b 적발). `bash -c`로(없으면 폴백). 하네스가 이미 Git Bash 가정. **커밋 게이트(`gate_on_commit`)에 이식** |
 | 2026-06-15 | `/wook-plan`이 recipe를 **누적 금지·작고 빠른 set으로 수렴** | 형욱 발견: plan마다 recipe에 기능 기준이 *덧붙어* 무한 비대 → 게이트가 점점 느려짐(1줄 수정에도 무거운 더미 실행). 수정: 스킬이 기준을 *테스트로* 표현(표준 `pytest` 줄이 커버), recipe엔 표준 빠른 검사만, 느린/시각 검사는 `/wook-evaluate`로, 쓸 때 cruft prune. "merge로 쌓기" 폐기 |
-| 2026-06-15 | #16 **자동 게이트 = Stop(매 턴) → 커밋 게이트(PreToolUse `git commit`)** | 형욱: 결정론 게이트가 *매 턴/자잘한 수정*마다 발동해 너무 잦음(off 끄고 싶을 정도). 줄 수 기준 엄격화는 구멍(1줄 버그 놓침)이라 ✗ → 발동 *granularity*를 커밋(의도적 "한 단위")으로. `gate_on_commit.py`가 `git commit` 가로채 recipe 실행, 실패면 deny(`--no-verify`로 우회). Stop `evaluate_gate.py`+`verified_head`/`code_sig` 전부 **폐기**(삭제). test_gate_on_commit 6/6 |
+| 2026-06-15 | #16 **자동 게이트 = Stop(매 턴) → 커밋 게이트(PreToolUse `git commit`)** | 형욱: 결정론 게이트가 *매 턴/자잘한 수정*마다 발동해 너무 잦음(off 끄고 싶을 정도). 줄 수 기준 엄격화는 구멍(1줄 버그 놓침)이라 ✗ → 발동 *granularity*를 커밋(의도적 "한 단위")으로. `gate_on_commit.py`가 `git commit` 가로채 recipe 실행, 실패면 deny(`--no-verify`로 우회). Stop `evaluate_gate.py`+`verified_head`/`code_sig` 전부 **폐기**(삭제). test_gate_on_commit 6/6 · 메커니즘 → **대체됨**(2026-07-06 #17 git 네이티브 pre-commit; granularity 결정은 유지) |
 | 2026-06-15 | `plan.md` 수명 = **현재 플랜만**(누적 X), 끝난 건 build-log | 형욱 발견: plan.md에 완료 SPEC이 계속 쌓임(recipe도 — 지난 수정으로 처리). plan.md는 *in-flight* 한 개만, `/wook-plan`이 **덮어쓰기**. 영구 기록은 build-log. 주기적/수동 정리 불필요(자동 수렴). 이 repo plan.md를 상시 자기검증 1개로 정리(완료 SPEC 6개 제거) |
+| 2026-07-06 | **v2 원칙: 검증된/네이티브 운반체 우선** — 2026 중반 트렌드 감사(에이전트 18개 리서치: Anthropic 공식·harness 담론·loop eng.·검증 게이트·spec-driven·context eng.·경쟁 하네스 등 10+3 관점) 반영 | 감사 결론: 철학(결정론 hook·PGE·커밋 게이트)은 업계 컨센서스와 일치, 단 ① 게이트가 자기 자신을 보호 못 함(CI-gaming) ② 손수 만든 메커니즘이 플랫폼 네이티브와 중복. 형욱 승인: "기존 구조 고수보다 검증된 방법 우선" |
+| 2026-07-06 | #17 **커밋 게이트 = git 네이티브 `pre-commit`**(`gate_runner.py` + `install_gate.py`), `gate_on_commit.py` 폐기 | Bash 문자열 파싱은 복합명령/alias 놓치면 조용히 열리고 모든 Bash 호출에 300s 훅. pre-commit은 어느 에이전트든+사람 커밋에도 동일 발동, `--no-verify` 네이티브, Codex 어댑터 절반 불필요. #16의 *granularity(커밋 시점)* 결정은 유지, 메커니즘만 교체. 게이트에 **자기보호**(staged recipe 변경/테스트 삭제 → `GATE_EDIT_OK=1` 요구; GitHub "CI 약화=차단" 가이드) + **stall 감지**(같은 실패 3연속 → "사람에게") + 포인터 신선도 경고 통합 |
+| 2026-07-06 | **core-rules 운반체 = `~/.claude/CLAUDE.md`** marked block(deploy 렌더), `inject_core_rules.py` 폐기 | 매 턴 additionalContext 주입은 transcript에 누적(~700토큰×턴). CLAUDE.md는 1회 로드·프롬프트 캐시·compaction 후 재주입이 공식 문서화된 운반체. 블록 밖 내용 보존(형욱 메모 공존) |
+| 2026-07-06 | `inject_plan_pointer.py` 신설 — plan.md 수용 기준을 매 턴 재주입 | 상시 규칙은 CLAUDE.md로 갔지만 *진행 중 계약*(plan.md)은 동적이라 CLAUDE.md가 못 나름 → planning-with-files 검증 패턴(디스크 plan + 매 턴 재주입, compaction 생존). 기준 섹션만 ~1500자 캡. core-rules 주입 제거와 합쳐 총 주입량 순감 |
+| 2026-07-06 | `guard_bash.py` 신설(파국 명령 **ask**) + `guard_paths`에 게이트 파일 ask | Windows엔 OS 샌드박스 없음 → hook이 유일한 바닥(빌드로그 §5 후보였음). rm -rf 홈/루트, force-push, reset --hard, 게이트 우회 채널(pre-commit 변조·evaluate-off 생성·recipe 리다이렉트). deny 아닌 ask=사람이 결정. recipe Edit도 ask(기준 변경=사람 승인, /wook-plan당 1회 마찰 수용 — 형욱 선택) |
+| 2026-07-06 | **Stop 훅 3→1**(remind_evaluator만 유지), 포인터 검사 2개는 게이트로 이동 | 포인터 신선도는 커밋 시점 속성인데 매 Stop마다 실행(알림 피로 — #16과 같은 교훈). 커밋 게이트의 경고(비차단)로 통합 |
+| 2026-07-06 | phaser4_reminder(SessionStart)는 repo 미흡수 | 형욱: 한 프로젝트에만 해당 → 글로벌 훅 부적합. deploy 시 글로벌 등록 소실 수용, 해당 프로젝트 로컬로 재설치 예정 |
 
 ---
 
@@ -98,7 +105,10 @@
   (Write로 `x=1+2` 생성 → hook이 `x = 1 + 2` 등으로 교정). ✅ live
 - **안전:** ruff 없음/포맷 실패/잘못된 입력 → 전부 조용히 exit 0, 편집 절대 안 막음.
 
-### ✅ #2 UserPromptSubmit — 망각 방지(core-rules 재주입)
+### ⛔ #2 UserPromptSubmit — 망각 방지(core-rules 재주입) → **대체됨: v2 CLAUDE.md 운반체(2026-07-06)**
+> 매 턴 additionalContext 주입은 transcript에 누적되는 토큰세(~700토큰×턴)였고, 그 사이
+> CLAUDE.md의 1회 로드·캐시·compaction 후 재주입이 공식 문서화됨 → `deploy.py`가
+> `core-rules.md`를 `~/.claude/CLAUDE.md`의 marked block으로 렌더(§2-I #17). 이하는 히스토리.
 - **목적:** 매 프롬프트마다 핵심 지침을 `additionalContext`로 주입 → 대화 길어져도 안 흐려짐.
 - **파일:**
   - `~/.claude/harness/core-rules.md` — 주입할 **순수 규칙**(사실 진술체)
@@ -359,23 +369,53 @@ LLM 평가자(서브에이전트)만 가능(결정론 셸 게이트는 브라우
 
 ---
 
+## 2-I. 하네스 v2 — 검증된 운반체로 재배치 (2026-07-06)
+
+### ✅ #17 v2 재배치 — pre-commit 게이트 · CLAUDE.md 규칙 · plan 재주입 · bash 가드
+- **배경:** 2026 중반 트렌드 감사(멀티에이전트 리서치 18개) → "철학은 컨센서스와 일치,
+  운반체를 네이티브로" + 구멍 2개(게이트 자기보호·위험 명령 가드). 형욱 승인 4건
+  (스펙 / recipe-ask ON / core-rules 주입 완전 삭제 / phaser4 미흡수).
+- **게이트(#16 → #17):** `claude/harness/gate_runner.py`를 `.git/hooks/pre-commit`이 실행
+  (`install_gate.py`가 설치, 멱등·타 훅 보호). 기능: recipe 실행(bash -c, Windows 검증 유지)
+  + **자기보호**(staged에 recipe M/D/R 또는 테스트 삭제 → `GATE_EDIT_OK=1` 요구; recipe
+  A(신규)는 통과 = 게이트 켜는 행위) + **stall**(같은 정규화 실패 시그니처 3연속 →
+  "반복 말고 사람에게"; 성공 시 상태 삭제) + 포인터 신선도 경고(구 Stop 검사 2개 흡수, 비차단).
+- **주입 재편:** core-rules → `~/.claude/CLAUDE.md` marked block(`build_user_claude_md`,
+  블록 밖 보존·멱등) / 신규 `inject_plan_pointer.py`(plan.md 수용 기준 섹션만 ~1500자 캡).
+  UserPromptSubmit은 여전히 3개(plan·reuse·convention)지만 상시 ~700토큰 주입이 빠져 순감.
+- **가드:** `guard_bash.py`(파국 명령·게이트 우회 채널 → ask, 오탐 0 목록, "정책 레이어지
+  보안 경계 아님" 명시) / `guard_paths.py`에 recipe·evaluate-off **ask** 추가(deny 목록 불변).
+- **삭제:** gate_on_commit.py · inject_core_rules.py · check_reuse_pointers.py ·
+  check_convention_pointers.py (+ test_gate_on_commit.py → test_gate_runner.py로 대체).
+- **검증:** `tools/run_tests.py`(신규 러너) 7/7 파일 PASS — test_gate_runner 14케이스
+  (A–N: 통과/실패/무레시피/off/비-git/자기보호 4종/stall 2종/포인터 경고 2종),
+  test_guard_bash 29케이스(위험 18→ask·안전 11→통과), test_inject_plan_pointer 6,
+  test_conventions 6(게이트 러너로 이식), test_codex_adapter(+CLAUDE.md 빌더 4·ask 3).
+  selfcheck에 harness/*.py 컴파일·settings→스크립트 존재 대조·pre-commit 미설치 경고 추가.
+- **정직한 한계:** guard_bash는 문자열 매칭 = 우발 사고 방지용이지 보안 경계 아님(인터프리터
+  우회 가능 — 연구로 문서화됨). 원격(클라우드) 세션엔 pre-commit 미설치 → 게이트 안 돎
+  (구 gate_on_commit도 ~/.claude 없는 원격에선 동일했음 — 회귀 아님).
+
+---
+
 ## 3. 파일 인벤토리 (`~/.claude`)
 
 ```
 ~/.claude/
 ├─ settings.json                     # hooks 등록(PreToolUse, PostToolUse, UserPromptSubmit, Stop)
-├─ hooks/
-│  ├─ guard_paths.py                  # #3 보호 경로 가드(deny)
+├─ CLAUDE.md                          # #17 상시 규칙(marked block, deploy가 core-rules에서 렌더)
+├─ hooks/                             # 7개 (v2: gate_on_commit·inject_core_rules·check_* 2개 폐기)
+│  ├─ guard_paths.py                  # #3 보호 경로 deny + 게이트 파일 ask(#17)
+│  ├─ guard_bash.py                   # #17 파국 명령 ask(rm -rf 홈/루트·force-push·게이트 우회)
 │  ├─ format_py.py                    # #1 자동 포맷
-│  ├─ inject_core_rules.py            # #2 망각 방지 주입
+│  ├─ inject_plan_pointer.py          # #17 진행 중 plan 수용 기준 재주입
 │  ├─ inject_reuse_pointer.py         # #9 재사용 카탈로그 포인터
 │  ├─ inject_convention_pointer.py    # #11 컨벤션 포인터
-│  ├─ gate_on_commit.py               # #16 커밋 게이트(PreToolUse, git commit 가로채기)
-│  ├─ check_reuse_pointers.py         # #9 스테일 포인터 알림(Stop hook, 비차단)
-│  ├─ check_convention_pointers.py    # #11 컨벤션 스테일 알림(Stop hook, 비차단)
 │  └─ remind_evaluator.py             # #12 독립 평가자 리마인더(Stop hook, 비차단)
 ├─ harness/
-│  ├─ core-rules.md                   # 주입되는 규칙(편집 대상)
+│  ├─ gate_runner.py                  # #17 커밋 게이트 본체(.git/hooks/pre-commit이 실행)
+│  ├─ install_gate.py                 # #17 pre-commit 쉼 설치(멱등, 남의 훅 안 덮음)
+│  ├─ core-rules.md                   # 상시 규칙 소스(CLAUDE.md·AGENTS.md로 렌더됨)
 │  ├─ core-rules.README.md            # 규칙 작성 가이드
 │  ├─ evaluate.recipe.example         # 검증 레시피 템플릿(프로젝트로 복사)
 │  ├─ conventions.frontend.example    # #11 frontend 컨벤션 템플릿
@@ -384,13 +424,15 @@ LLM 평가자(서브에이전트)만 가능(결정론 셸 게이트는 브라우
 │  └─ wook-evaluator.md               # #5 독립 Evaluator 서브에이전트
 └─ skills/
    ├─ wook-evaluate/SKILL.md          # /wook-evaluate 진입점
-   ├─ wook-plan/SKILL.md              # #8 /wook-plan (Planner)
+   ├─ wook-plan/SKILL.md              # #8 /wook-plan (Planner; recipe 작성+게이트 설치)
    ├─ wook-brainstorm/SKILL.md        # #10 /wook-brainstorm (발산, PGE 앞단)
    ├─ wook-index/SKILL.md             # #9 /wook-index (재사용 카탈로그 생성)
    ├─ wook-conventions/SKILL.md       # #11 /wook-conventions (컨벤션 생성, bimodal)
    ├─ wook-map/SKILL.md               # #13 /wook-map (프로젝트 지도 생성)
    └─ wook-onboard/SKILL.md           # #14 /wook-onboard (기존 repo 한 방 온보딩)
 ```
+프로젝트 쪽: recipe 있는 repo의 `.git/hooks/pre-commit`(install_gate가 설치) → gate_runner 실행.
+stall 카운터는 `<git-dir>/wook-gate-state.json`(로컬, 커밋 안 됨).
 
 ---
 
@@ -406,13 +448,13 @@ my-claude-harness/                  # git repo (비밀 0, 단순 blacklist .giti
 ├─ CLAUDE.md                        # 이 repo 작업 시 컨벤션(build-log 갱신 등)
 ├─ docs/{claude-harness-design, build-log}.md
 ├─ claude/                          # ~/.claude 산출물의 source of truth
-│  ├─ hooks/{guard_paths, format_py, inject_core_rules, inject_reuse_pointer, inject_convention_pointer, gate_on_commit, check_reuse_pointers, check_convention_pointers, remind_evaluator}.py
-│  ├─ harness/{core-rules.md, core-rules.README.md, evaluate.recipe.example, conventions.frontend.example, project-map.example}
+│  ├─ hooks/{guard_paths, guard_bash, format_py, inject_plan_pointer, inject_reuse_pointer, inject_convention_pointer, remind_evaluator}.py
+│  ├─ harness/{gate_runner.py, install_gate.py, core-rules.md, core-rules.README.md, evaluate.recipe.example, conventions.frontend.example, project-map.example}
 │  ├─ agents/wook-evaluator.md       # #5 Evaluator 서브에이전트
 │  ├─ skills/{wook-evaluate, wook-plan, wook-brainstorm, wook-index, wook-conventions, wook-map, wook-onboard}/SKILL.md  # 진입점
 │  └─ settings.hooks.json           # 우리가 소유한 hooks 블록({HOOKS_DIR} placeholder)
 ├─ deploy.py                        # claude/ -> ~/.claude 배포 (--check drift시 exit 1)
-├─ tools/{selfcheck.py, test_gate_on_commit.py, test_conventions.py, test_evaluator.py, test_project_map.py, test_codex_adapter.py}  # 자기검증 + #16·#11~#13·#15 테스트
+├─ tools/{selfcheck.py, run_tests.py, test_gate_runner.py, test_guard_bash.py, test_inject_plan_pointer.py, test_conventions.py, test_evaluator.py, test_project_map.py, test_codex_adapter.py}  # 자기검증 러너 + #17·#11~#13·#15 테스트
 ├─ deploy.py                        # claude/ → ~/.claude|~/.codex 멱등 배포 (--target)
 ├─ .claude/{evaluate.recipe, plan.md}  # 이 repo 자신의 게이트 설정(자기검증 ON)
 └─ .gitignore
@@ -438,8 +480,12 @@ my-claude-harness/                  # git repo (비밀 0, 단순 blacklist .giti
 - [x] git repo 구조 확립(별도 클린 repo + `deploy.py` 배포) + 로컬 첫 커밋
 - [x] public 원격 연결 + push → https://github.com/sleepy-wook/my-claude-harness
 - [x] #3 PreToolUse 보호 경로 가드(deny) — 구체적 패턴만 차단(오탐 0)
-- [ ] (#3 확장 후보) 위험 bash 명령 가드(`rm -rf`, `git push --force` 등) — 의논
-- [ ] (#3 의미형) "안 시킨 행동" 판단 차단 — 판단 레이어(PGE)에서, 결정론 deny ✗
+- [x] (#3 확장) 위험 bash 명령 가드(`rm -rf`, `git push --force` 등) — #17 `guard_bash.py`(ask)
+- [ ] (#3 의미형) "안 시킨 행동" 판단 차단 — 판단 레이어(PGE)에서, 결정론 deny ✗.
+      부분 대응: v2 감사가 제안한 **스코프 glob 게이트**(plan에 허용 파일 목록 → 게이트가
+      staged 대조)가 Phase 2 후보
+- [ ] (Phase 2 후보, 감사 2026-07-06) 웹/Phaser **스모크 프로브**(`probe.mjs` 템플릿 →
+      recipe `smoke:` 한 줄, 게임이 뜨고 콘솔 깨끗한지 결정론 검증)
 
 > **step A(결정론 바닥) 사실상 완료.** 다음은 B(판단 루프/PGE) — 형욱과 의논하며.
 

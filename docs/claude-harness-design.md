@@ -161,12 +161,29 @@ Evaluator가 그 레시피를 *실제 실행*해서 채점.
 
 ---
 
+## 0-5. v2 개정 (2026-07-06) — 검증된/네이티브 운반체 우선
+
+2026 중반 트렌드 감사(멀티에이전트 리서치; 결론은 build-log #17) 후 형욱 승인으로 확정한
+**운반체 원칙**: 같은 목적이면 손수 만든 메커니즘보다 플랫폼/생태계가 검증한 네이티브를 쓴다.
+기능은 유지하고 운반체만 바꾼다. 이 원칙이 아래 원문(§1·§3-3 등)의 개별 서술보다 우선한다.
+
+| 기능 | v1 운반체 (원문) | v2 운반체 (현행) | 근거 |
+|------|----------------|----------------|------|
+| 망각 방지(상시 규칙) | UserPromptSubmit 매 턴 주입 | `~/.claude/CLAUDE.md` marked block (deploy 렌더) | 1회 로드·캐시·compaction 재주입 공식 문서화. 매 턴 주입은 transcript 누적 토큰세 |
+| 진행 중 plan 유지 | (없었음) | `inject_plan_pointer.py` 매 턴 재주입 | 동적 계약은 CLAUDE.md가 못 나름 — planning-with-files 검증 패턴 |
+| 커밋 게이트 | PreToolUse가 Bash 명령 문자열 파싱 | **git 네이티브 `.git/hooks/pre-commit`** → `gate_runner.py` | 어느 에이전트+사람 커밋에도 발동, `--no-verify` 네이티브, 파싱 누락 시 조용히 열리는 문제 제거 |
+| 게이트 자기보호 | (없었음 — 구멍) | staged recipe 변경/테스트 삭제 → `GATE_EDIT_OK=1` 요구 + recipe Edit는 ask | "CI를 약화시키는 변경 = 차단"(GitHub 에이전트 PR 가이드) |
+| 위험 명령 | (§8 후보로만 존재) | `guard_bash.py` → **ask**(사람 결정) | Windows엔 OS 샌드박스 없음 → hook이 유일한 바닥. 정책 레이어지 보안 경계 아님 |
+| 포인터 신선도 | Stop 훅 2개(매 턴) | 게이트 경고(커밋 시, 비차단) | 커밋 시점 속성을 매 Stop마다 검사 = 알림 피로(#16과 같은 교훈) |
+
+---
+
 ## 1. 풀어야 할 문제 → 해결 매핑
 
 | # | 문제 | 들어갈 위치 | 메커니즘 |
 |---|------|------------|----------|
-| 1 | 대화 길어지면 초반 지침을 잊음 | `UserPromptSubmit` hook | `additionalContext`로 매 턴 핵심 지침 재주입 |
-| 2 | 시키지 않은 걸 멋대로 함 (과잉행동) | `PreToolUse` hook | `exit 2` 또는 `permissionDecision: "deny"`로 차단 |
+| 1 | 대화 길어지면 초반 지침을 잊음 | `UserPromptSubmit` hook | `additionalContext`로 매 턴 핵심 지침 재주입 → **v2: 상시 규칙은 CLAUDE.md, 매 턴 주입은 plan/reuse/convention 포인터만(§0-5)** |
+| 2 | 시키지 않은 걸 멋대로 함 (과잉행동) | `PreToolUse` hook | `exit 2` 또는 `permissionDecision: "deny"`로 차단 (v2: 파국 명령·게이트 파일은 `ask`) |
 | 3 | 코드 스타일/규칙을 안 지킴 | `PostToolUse` hook | Edit/Write 직후 린터·포매터 자동 실행 |
 
 ---

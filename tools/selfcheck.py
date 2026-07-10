@@ -23,17 +23,19 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 errors: list[str] = []
 
-# 1. Scripts compile.
-scripts = sorted(glob.glob(str(REPO / "claude" / "hooks" / "*.py"))) + [
-    str(REPO / "deploy.py")
-]
+# 1. Scripts compile (hooks + harness runtime scripts + deploy).
+scripts = (
+    sorted(glob.glob(str(REPO / "claude" / "hooks" / "*.py")))
+    + sorted(glob.glob(str(REPO / "claude" / "harness" / "*.py")))
+    + [str(REPO / "deploy.py")]
+)
 for s in scripts:
     try:
         py_compile.compile(s, doraise=True)
     except py_compile.PyCompileError as e:
         errors.append(f"compile: {e}")
 
-# 2. settings.hooks.json valid + has the 4 events.
+# 2. settings.hooks.json valid + has the 4 events + references only real scripts.
 try:
     hooks = json.loads(
         (REPO / "claude" / "settings.hooks.json").read_text(encoding="utf-8")
@@ -41,6 +43,17 @@ try:
     missing = {"PreToolUse", "PostToolUse", "UserPromptSubmit", "Stop"} - set(hooks)
     if missing:
         errors.append(f"settings: missing hook events {sorted(missing)}")
+    for entries in hooks.values():
+        for e in entries:
+            for h in e.get("hooks", []):
+                for a in h.get("args", []):
+                    if (
+                        a.startswith("{HOOKS_DIR}/")
+                        and not (
+                            REPO / "claude" / "hooks" / a.split("/", 1)[1]
+                        ).exists()
+                    ):
+                        errors.append(f"settings: references missing hook script {a}")
 except Exception as e:
     errors.append(f"settings: {e}")
 
@@ -95,8 +108,21 @@ for s in scripts:
             "encoding= (breaks on Windows cp949)"
         )
 
-# 5. build-log growth nudge (non-failing): tiered-log policy says archive when large.
+# 5. non-failing nudges.
 warnings: list[str] = []
+# 5a. commit gate installed in THIS repo? (warning only — a fresh/remote clone
+#     legitimately lacks it until install_gate.py runs; must not fail CI there.)
+try:
+    _pc = REPO / ".git" / "hooks" / "pre-commit"
+    if not (
+        _pc.exists() and "wook-harness commit gate" in _pc.read_text(encoding="utf-8")
+    ):
+        warnings.append(
+            "commit gate not installed here — run: python claude/harness/install_gate.py"
+        )
+except Exception:
+    pass
+# 5b. build-log growth nudge: tiered-log policy says archive when large.
 try:
     n = len((REPO / "docs" / "build-log.md").read_text(encoding="utf-8").splitlines())
     if n > 700:

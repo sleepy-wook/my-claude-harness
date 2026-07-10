@@ -114,6 +114,33 @@ def build_codex_hooks_json(settings_text: str, hooks_dir: str) -> dict:
     return {"hooks": out}
 
 
+CLAUDE_MD_BEGIN = (
+    "<!-- wook-harness:begin (deploy.py가 core-rules.md에서 렌더 — 직접 수정 금지) -->"
+)
+CLAUDE_MD_END = "<!-- wook-harness:end -->"
+
+
+def build_user_claude_md(core_rules_text: str, existing: str | None) -> str:
+    """Render ~/.claude/CLAUDE.md: the core-rules body inside a marked block.
+
+    CLAUDE.md is loaded once per session (prompt-cached; per official docs it is
+    re-injected after compaction) — the validated carrier for standing rules,
+    replacing the old per-turn injection hook (~700 tokens duplicated every turn).
+    Only the marked block is owned; any text outside it is preserved verbatim.
+    """
+    body = "\n".join(
+        ln for ln in core_rules_text.splitlines() if not ln.startswith("# ")
+    ).strip()
+    block = f"{CLAUDE_MD_BEGIN}\n{body}\n{CLAUDE_MD_END}\n"
+    if existing and CLAUDE_MD_BEGIN in existing and CLAUDE_MD_END in existing:
+        pre = existing.split(CLAUDE_MD_BEGIN)[0]
+        post = existing.split(CLAUDE_MD_END, 1)[1].lstrip("\n")
+        return pre + block + post
+    if existing and existing.strip():
+        return existing.rstrip() + "\n\n" + block
+    return block
+
+
 def _strip_frontmatter(md: str) -> str:
     if md.startswith("---"):
         parts = md.split("---", 2)
@@ -178,6 +205,19 @@ def deploy_claude(check: bool) -> list:
         settings_path.write_text(
             json.dumps(settings, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
         )
+    # Standing rules ride in ~/.claude/CLAUDE.md (loaded once, cached) — v2 carrier
+    # replacing the per-turn inject_core_rules hook. Marked block only; rest preserved.
+    claude_md = dest / "CLAUDE.md"
+    existing = claude_md.read_text(encoding="utf-8") if claude_md.exists() else None
+    write_rendered(
+        claude_md,
+        build_user_claude_md(
+            (SRC / "harness" / "core-rules.md").read_text(encoding="utf-8"), existing
+        ),
+        "CLAUDE.md",
+        check,
+        actions,
+    )
     return actions
 
 

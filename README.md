@@ -18,10 +18,12 @@
 
 | 문제 | 해결 | 구성요소 |
 |------|------|----------|
-| 대화가 길어지면 초반 지침을 잊음 | 매 프롬프트마다 핵심 규칙 재주입 | hook `inject_core_rules` |
-| 시키지 않은 걸 멋대로 함 / 보호 파일 편집 | `.git`·키·시크릿 Edit/Write 차단 | hook `guard_paths` |
+| 대화가 길어지면 초반 지침을 잊음 | 상시 규칙은 `~/.claude/CLAUDE.md`(1회 로드·캐시·compaction 생존), 진행 중 plan의 수용 기준은 매 턴 재주입 | deploy 렌더 + hook `inject_plan_pointer` |
+| 시키지 않은 걸 멋대로 함 / 보호 파일 편집 | `.git`·키·시크릿 Edit/Write 차단, 게이트 기준 파일은 ask | hook `guard_paths` |
+| 파국적 명령을 자동 실행 | rm -rf 홈/루트, force-push, reset --hard 등은 **ask**(사람이 결정) | hook `guard_bash` |
 | 스타일을 안 지킴 | 편집 직후 자동 포맷 | hook `format_py` |
-| "테스트 안 돌리고 됐다고 함" | **커밋 시 실제 검증**, 통과 전엔 커밋 차단 | 커밋 게이트 `gate_on_commit` |
+| "테스트 안 돌리고 됐다고 함" | **커밋 시 실제 검증**, 통과 전엔 커밋 차단 — git 네이티브 `pre-commit` | 커밋 게이트 `gate_runner` |
+| 막히면 같은 수정 무한 반복 | 같은 실패 3연속이면 게이트가 "멈추고 사람에게" 지시 | `gate_runner` stall 감지 |
 | 본인이 자기 코드를 후하게 평가 | **독립** 평가자가 도메인 맞는 방식으로 실제 검증 | `wook-evaluate` + `wook-evaluator` |
 | 기존 코드 중복 생성 / 규칙 안 지킴 | 프로젝트 지식(.claude/)을 읽고 재사용·준수 | `wook-index` / `wook-conventions` |
 | 매번 "어떻게 띄우지?" 재발견 | 구조·스택·실행법을 지도로 유지 | `wook-map` |
@@ -36,9 +38,11 @@ Playwright MCP(프론트 화면 평가용).
 ```bash
 git clone https://github.com/sleepy-wook/my-claude-harness.git
 cd my-claude-harness
-python deploy.py          # claude/ → ~/.claude 배포 + settings.json에 hooks 병합 (멱등)
+python deploy.py          # claude/ → ~/.claude 배포 + settings.json hooks 병합 + CLAUDE.md 렌더 (멱등)
 ```
-- 미리 보기: `python deploy.py --check`. 배포되는 것: `hooks/`·`harness/`·`agents/`·`skills/`.
+- 미리 보기: `python deploy.py --check`. 배포되는 것: `hooks/`·`harness/`·`agents/`·`skills/` + `CLAUDE.md`(상시 규칙).
+- 프로젝트에서 recipe를 쓰기 시작하면 `python ~/.claude/harness/install_gate.py`로 그 repo에 커밋 게이트 설치
+  (`/wook-plan`·`/wook-onboard`가 recipe 쓸 때 같이 해준다).
 - **Claude Code 재시작** — 스킬/에이전트는 세션 시작 시 로드(첫 배포 후 1회). hook은 재시작 없이 곧 반영.
 - 새 PC 복원: `clone → deploy → 재시작` 반복.
 
@@ -83,7 +87,7 @@ python deploy.py --target=codex     # ~/.codex 로: hooks.json·skills/·AGENTS.
 
 <a id="wook-plan"></a>
 ### `/wook-plan` — 코드 전에 "완료"를 정의
-- **무엇:** 짧은 요청을 *실행 가능한 수용 기준* 스펙으로 확장하고, 그 기준을 `.claude/evaluate.recipe`로 박는다(작고 빠른 set로 유지). **레시피가 있으면 커밋 게이트가 `git commit` 때 그 기준으로 검증한다.**
+- **무엇:** 짧은 요청을 *실행 가능한 수용 기준* 스펙으로 확장하고, 그 기준을 `.claude/evaluate.recipe`로 박은 뒤 **커밋 게이트(`.git/hooks/pre-commit`)를 설치**한다(작고 빠른 set로 유지). 이후 `git commit` 때마다 그 기준으로 검증된다.
 - **언제:** 중간 규모 이상 기능 시작 전. "plan this", "수용 기준 정의".
 - **어떻게:** `/wook-plan <기능>` → (모호하면 질문) → SPEC(범위/엣지/수용기준) 제시 → recipe 제안 → 승인 → `.claude/{evaluate.recipe, plan.md}` 작성 → 구현. 기준은 *머신이 실제로 돌릴 수 있는 것*만(테스트 통과, exit 0, 200 응답…).
 - **산출물:** `.claude/evaluate.recipe`, `.claude/plan.md`.
@@ -151,21 +155,26 @@ hook은 생명주기 특정 시점에 **반드시** 실행되는 스크립트다
 
 | 이벤트 | 하는 일 | 스크립트 |
 |--------|---------|----------|
-| `UserPromptSubmit` | core-rules 재주입(망각 방지) | `inject_core_rules.py` |
+| `UserPromptSubmit` | 진행 중 plan의 수용 기준 재주입(compaction 생존) | `inject_plan_pointer.py` |
 | `UserPromptSubmit` | 재사용 카탈로그 포인터 주입 | `inject_reuse_pointer.py` |
 | `UserPromptSubmit` | 컨벤션 포인터 주입 | `inject_convention_pointer.py` |
-| `PreToolUse` (Edit\|Write) | 보호 경로 deny(.git·키·시크릿) | `guard_paths.py` |
+| `PreToolUse` (Edit\|Write) | 보호 경로 deny(.git·키·시크릿) + 게이트 기준 파일 ask | `guard_paths.py` |
+| `PreToolUse` (Bash\|PowerShell) | 파국 명령 ask(rm -rf 홈/루트, force-push, reset --hard, 게이트 우회…) | `guard_bash.py` |
 | `PostToolUse` (Edit\|Write) | `.py` 자동 포맷(ruff) | `format_py.py` |
-| `PreToolUse` (Bash) | 커밋 게이트 — `git commit` 시 recipe 검증, 실패면 deny | `gate_on_commit.py` |
-| `Stop` | 재사용 스테일 포인터 알림 | `check_reuse_pointers.py` |
-| `Stop` | 컨벤션 스테일 포인터 알림 | `check_convention_pointers.py` |
 | `Stop` | "독립 평가자 돌려" 리마인더 | `remind_evaluator.py` |
 
-모든 스크립트는 문제가 생겨도 작업을 막지 않도록 안전하게 빠진다. 차단은 **의도된 곳**에서만 — 보호 경로 deny,
-그리고 **커밋 게이트**(`git commit` 시 recipe 미통과면 커밋 deny; `--no-verify`로 우회). 검증은 매 턴이 아니라
+**커밋 게이트는 hook이 아니라 git 자체에 산다** — `.git/hooks/pre-commit`(설치:
+`python ~/.claude/harness/install_gate.py`)이 `gate_runner.py`를 실행해 recipe를 검증한다.
+어느 에이전트든, 사람이 터미널에서 커밋해도 동일하게 걸리고, `--no-verify`가 네이티브 우회다.
+게이트는 ① recipe 실행(미통과면 커밋 차단) ② **자기보호**(staged에 recipe 변경/테스트 삭제가
+섞이면 `GATE_EDIT_OK=1` 없이는 차단 — 기준 약화는 사람이 승인) ③ **stall 감지**(같은 실패
+3연속이면 "반복 말고 사람에게") ④ reuse/convention 스테일 포인터 경고(차단 아님)를 수행한다.
+
+모든 스크립트는 문제가 생겨도 작업을 막지 않도록 안전하게 빠진다. 검증은 매 턴이 아니라
 **커밋(한 단위 완료) 시점**에만 돌아 자잘한 수정·질문엔 발동하지 않는다.
 
-- core-rules 편집: `~/.claude/harness/core-rules.md`(다음 프롬프트부터 반영). repo 관리는 `claude/harness/core-rules.md` 고치고 `python deploy.py`.
+- 상시 규칙(standing rules) 편집: repo의 `claude/harness/core-rules.md` 고치고 `python deploy.py`
+  → `~/.claude/CLAUDE.md`의 marked block으로 렌더(블록 밖 내용은 보존). **다음 세션부터 반영.**
 
 ---
 
@@ -179,6 +188,9 @@ hook은 생명주기 특정 시점에 **반드시** 실행되는 스크립트다
   MCP로** 독립 평가자가 본다.
 - **source-of-truth + 배포:** 실제 하네스는 비밀 많은 `~/.claude`에 사니 직접 git하지 않는다. **이 repo가
   원본**, `deploy.py`가 복사 — repo엔 비밀이 0이라 구조적으로 안전.
+- **검증된 운반체 우선(v2):** 같은 목적이면 손수 만든 메커니즘보다 네이티브를 쓴다 — 게이트는
+  Bash 명령 파싱 대신 git `pre-commit`, 상시 규칙은 매 턴 주입 대신 `CLAUDE.md`(1회 로드·캐시).
+  줄어든 건 유지할 코드와 매 턴 토큰이고, 기능은 그대로다.
 
 ### 하네스 자체를 업데이트할 때
 ```bash
@@ -198,8 +210,8 @@ my-claude-harness/
 │  ├─ build-log.md                 # 실제 빌드 기록
 │  └─ harness-overview.svg         # 위 구조 다이어그램
 ├─ claude/                         # ~/.claude 로 배포되는 원본 (비밀 0)
-│  ├─ hooks/                       # 9개 hook 스크립트
-│  ├─ harness/                     # core-rules + 템플릿(recipe·conventions·project-map)
+│  ├─ hooks/                       # 7개 hook 스크립트 (guard·inject·format·remind)
+│  ├─ harness/                     # core-rules + gate_runner/install_gate + 템플릿
 │  ├─ agents/wook-evaluator.md     # 독립 Evaluator 서브에이전트
 │  └─ skills/{wook-plan, wook-brainstorm, wook-evaluate,
 │             wook-onboard, wook-map, wook-conventions, wook-index}/SKILL.md
