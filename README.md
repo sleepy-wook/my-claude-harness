@@ -71,8 +71,11 @@ python deploy.py --target=codex     # ~/.codex 로: hooks.json·skills/·AGENTS.
 | [`/wook-map`](#wook-map) | 프로젝트 지도(구조·스택·실행법) | 지식 |
 | [`/wook-conventions`](#wook-conventions) | 도메인 코딩 컨벤션 | 지식 |
 | [`/wook-index`](#wook-index) | 재사용 카탈로그 | 지식 |
+| `/wook-audit` | 전체 트리 상시 감사 원장(`.claude/audit/`) | 지식 |
+| `/wook-sandbox` | 격리 제작 → 써보고 → 졸업(실제 경로로 이동) | 제작 |
 
 > 트리거는 직접 타이핑(`/wook-plan`)하거나, 설명에 맞는 상황이면 Claude가 알아서 제안한다.
+> (`/wook-audit`·`/wook-sandbox`는 상세 절 없이 스킬 본문이 안내 — SKILL.md 참조.)
 
 ---
 
@@ -101,7 +104,7 @@ python deploy.py --target=codex     # ~/.codex 로: hooks.json·skills/·AGENTS.
   - **backend** → 엔드포인트 호출, 상태/응답/로그
   - **db** → 쿼리로 스키마·데이터
   - → `VERDICT: PASS | FAIL | INCONCLUSIVE` 를 **그대로** 전달(거짓 PASS 금지; 못 돌리면 INCONCLUSIVE).
-- **자동 리마인더:** 코드를 바꾼 턴이면 Stop hook이 "비사소면 독립 평가자 돌려"라고 알린다(사소 판단은 본인 몫).
+- **자동 리마인더:** 커밋 직후 1회, 커밋이 충분히 클 때만(≥30줄) "독립 평가자 돌려"라고 알린다(사소 판단은 본인 몫 — 매 턴 잔소리 X).
 - **관련:** `wook-evaluator`(agent)는 도구가 `Bash·Read·Grep·Glob·Playwright MCP`로 제한 — **코드 못 고침**(판정만), 빌트인 브라우저 대신 Playwright MCP만.
 
 <a id="wook-onboard"></a>
@@ -161,7 +164,7 @@ hook은 생명주기 특정 시점에 **반드시** 실행되는 스크립트다
 | `PreToolUse` (Edit\|Write) | 보호 경로 deny(.git·키·시크릿) + 게이트 기준 파일 ask | `guard_paths.py` |
 | `PreToolUse` (Bash\|PowerShell) | 파국 명령 ask(rm -rf 홈/루트, force-push, reset --hard, 게이트 우회…) | `guard_bash.py` |
 | `PostToolUse` (Edit\|Write) | `.py` 자동 포맷(ruff) | `format_py.py` |
-| `Stop` | "독립 평가자 돌려" 리마인더 | `remind_evaluator.py` |
+| `PostToolUse` (Bash) | 커밋 직후 1회, 큰 커밋(≥30줄)일 때만 "독립 평가자 돌려" 리마인더 | `remind_evaluator.py` |
 
 **커밋 게이트는 hook이 아니라 git 자체에 산다** — `.git/hooks/pre-commit`(설치:
 `python ~/.claude/harness/install_gate.py`)이 `gate_runner.py`를 실행해 recipe를 검증한다.

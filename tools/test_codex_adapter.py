@@ -31,8 +31,8 @@ print("Test — Codex hooks.json transform")
 cj = deploy.build_codex_hooks_json(settings_text, HD)
 events = set(cj.get("hooks", {}))
 check(
-    "valid + has 4 events",
-    {"PreToolUse", "PostToolUse", "UserPromptSubmit", "Stop"} <= events,
+    "valid + has the core events",
+    {"PreToolUse", "PostToolUse", "UserPromptSubmit"} <= events,
 )
 json.dumps(cj)  # must be serialisable
 check(

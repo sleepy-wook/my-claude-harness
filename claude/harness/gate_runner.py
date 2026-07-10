@@ -94,11 +94,47 @@ def load_recipe(root: Path):
     return checks or None
 
 
+def find_bash() -> str | None:
+    """Locate a Git Bash / MSYS bash — NOT the WSL launcher.
+
+    On Windows with WSL installed, `shutil.which("bash")` returns
+    `C:\\Windows\\System32\\bash.exe`, the WSL entry point. Running the recipe
+    through it executes the checks inside a *different* (Linux) filesystem where the
+    project path (`C:\\...` -> `/mnt/c/...`) and the Windows `python` don't exist, so
+    every check fails and the commit is wrongly denied (this also let a Windows
+    `--no-verify`-less commit slip through when the gate errored). Skip anything under
+    `%WINDIR%` and prefer real Git Bash; None => caller falls back to the OS shell."""
+    windir = os.environ.get("WINDIR", r"C:\Windows").lower()
+    found = shutil.which("bash")
+    if found and not found.lower().startswith(windir):
+        return found  # Linux/Mac (/usr/bin/bash) or Git Bash earlier on PATH
+    for cand in (
+        r"C:\Program Files\Git\bin\bash.exe",
+        r"C:\Program Files\Git\usr\bin\bash.exe",
+        r"C:\Program Files (x86)\Git\bin\bash.exe",
+    ):
+        if os.path.exists(cand):
+            return cand
+    try:  # derive from the active git install (handles non-default drives)
+        ep = subprocess.run(
+            ["git", "--exec-path"], capture_output=True, text=True, timeout=10
+        ).stdout.strip()
+        if ep:
+            for up in Path(ep).parents:
+                cand = up / "bin" / "bash.exe"
+                if cand.exists():
+                    return str(cand)
+    except Exception:
+        pass
+    return None  # no Git Bash -> run via the OS shell (cmd.exe on Windows)
+
+
 def run(cmd: str, cwd: Path):
-    """Run a recipe command via bash where available so POSIX syntax (`!`, globs,
-    pipes) behaves the same on every OS; on Windows `shell=True` would use cmd.exe."""
+    """Run a recipe command via Git Bash where available so POSIX syntax (`!`, globs,
+    pipes) behaves the same on every OS. The WSL bash is deliberately avoided (see
+    find_bash); without bash we fall back to the OS shell (cmd.exe on Windows)."""
     try:
-        bash = shutil.which("bash")
+        bash = find_bash()
         argv, shell = ([bash, "-c", cmd], False) if bash else (cmd, True)
         p = subprocess.run(
             argv,

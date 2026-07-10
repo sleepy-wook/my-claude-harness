@@ -34,9 +34,13 @@ Generator implements; the gate (a git `pre-commit` hook) enforces it at commit t
    - The recipe holds only the project's **standing fast checks** (tests, lint, typecheck).
      Add a NEW line only for a genuinely new *category* of fast check, never per criterion.
      **Do not accumulate** one-off commands.
-   - Route **slow or non-deterministic** checks (full e2e, build, integration, Playwright
-     visual) to on-demand `/wook-evaluate`, NOT the commit gate. Mark **MANUAL** anything that
-     can't be automated (don't fake a command).
+   - **Scope lint/format to CHANGED files, not the whole repo.** A trivial one-line commit must
+     not lint the entire tree. Prefer staged-file scoping, e.g.
+     `lint: git diff --cached --name-only --diff-filter=ACM | grep -E '\.(ts|tsx)$' | xargs -r npx eslint`
+     over a whole-repo glob (`eslint .` / `**/*`). Same for stylelint/prettier.
+   - Route **slow** checks (`build`, full e2e, integration, Playwright visual) to on-demand
+     `/wook-evaluate`, **NEVER the commit gate** — `build` in the gate makes every trivial commit
+     slow. Mark **MANUAL** anything that can't be automated (don't fake a command).
 
 4. **Get approval / edits** from the developer before writing anything.
 

@@ -38,6 +38,18 @@
             "statusMessage": "ruff format"
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": ["{HOOKS_DIR}/remind_evaluator.py"],
+            "timeout": 20,
+            "statusMessage": "evaluator reminder"
+          }
+        ]
       }
     ],
     "UserPromptSubmit": [
@@ -63,19 +75,6 @@
             "args": ["{HOOKS_DIR}/inject_convention_pointer.py"],
             "timeout": 15,
             "statusMessage": "convention pointer"
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python",
-            "args": ["{HOOKS_DIR}/remind_evaluator.py"],
-            "timeout": 20,
-            "statusMessage": "evaluator reminder"
           }
         ]
       }

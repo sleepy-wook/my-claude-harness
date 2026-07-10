@@ -2,9 +2,10 @@
 """Self-verification for the claude-harness repo. Exit 0 = all checks pass.
 
 Wired into `.claude/evaluate.recipe` so the harness verifies its OWN integrity —
-i.e. it dogfoods its own Stop-gate / /wook-evaluate. Checks (static, no runtime):
-  1. all hook scripts + deploy.py compile
-  2. settings.hooks.json is valid JSON and declares the 4 expected hook events
+i.e. it dogfoods its own commit gate / /wook-evaluate. Checks (static, no runtime):
+  1. all hook + harness scripts + deploy.py compile
+  2. settings.hooks.json is valid JSON, declares the core hook events, and every
+     registered hook references a script that actually exists
   3. every skill / agent markdown has a `name:` frontmatter
   4. no secret-like files are tracked in git
 
@@ -35,12 +36,14 @@ for s in scripts:
     except py_compile.PyCompileError as e:
         errors.append(f"compile: {e}")
 
-# 2. settings.hooks.json valid + has the 4 events + references only real scripts.
+# 2. settings.hooks.json valid + has the core events + references only real scripts.
+#    Stop is optional (v2 folded the pointer checks into the commit gate and moved the
+#    evaluator reminder to PostToolUse, so there may be no Stop hook at all).
 try:
     hooks = json.loads(
         (REPO / "claude" / "settings.hooks.json").read_text(encoding="utf-8")
     )["hooks"]
-    missing = {"PreToolUse", "PostToolUse", "UserPromptSubmit", "Stop"} - set(hooks)
+    missing = {"PreToolUse", "PostToolUse", "UserPromptSubmit"} - set(hooks)
     if missing:
         errors.append(f"settings: missing hook events {sorted(missing)}")
     for entries in hooks.values():
@@ -140,7 +143,7 @@ if errors:
         print("  -", e)
     sys.exit(1)
 print(
-    f"SELFCHECK OK: {len(scripts)} scripts compile, settings has 4 events, "
+    f"SELFCHECK OK: {len(scripts)} scripts compile, settings events ok, "
     f"{len(mds)} md frontmatter ok, no tracked secrets"
 )
 for w in warnings:
