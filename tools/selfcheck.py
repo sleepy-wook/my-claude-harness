@@ -107,6 +107,18 @@ try:
 except Exception:
     pass
 
+# 5b. core-rules size nudge (non-failing): inject_core_rules truncates SILENTLY at
+#     9000 chars — rules past the cap just vanish from every turn. Warn well before.
+try:
+    n = len((REPO / "claude" / "harness" / "core-rules.md").read_text(encoding="utf-8"))
+    if n > 8000:
+        warnings.append(
+            f"core-rules.md is {n} chars (cap 9000 in inject_core_rules) — rules past "
+            "the cap are silently dropped every turn. Trim/merge rules now."
+        )
+except Exception:
+    pass
+
 # Verdict.
 if errors:
     print("SELFCHECK FAIL:")

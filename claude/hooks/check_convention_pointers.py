@@ -25,9 +25,29 @@ import sys
 from pathlib import Path
 
 CODE_EXT = {
-    ".py", ".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs", ".go", ".rs", ".java",
-    ".rb", ".php", ".c", ".cc", ".cpp", ".h", ".hpp", ".cs", ".kt", ".swift",
-    ".sql", ".css", ".scss",
+    ".py",
+    ".js",
+    ".jsx",
+    ".ts",
+    ".tsx",
+    ".mjs",
+    ".cjs",
+    ".go",
+    ".rs",
+    ".java",
+    ".rb",
+    ".php",
+    ".c",
+    ".cc",
+    ".cpp",
+    ".h",
+    ".hpp",
+    ".cs",
+    ".kt",
+    ".swift",
+    ".sql",
+    ".css",
+    ".scss",
 }
 
 
@@ -43,7 +63,8 @@ def find_conventions_dir(start: Path):
     return None, None
 
 
-def code_changed(root: Path) -> bool:
+def changed_paths(root: Path):
+    """Changed file paths from git status; None = unknown (fail open to full scan)."""
     try:
         out = subprocess.run(
             ["git", "status", "--porcelain"],
@@ -53,16 +74,17 @@ def code_changed(root: Path) -> bool:
             timeout=20,
         ).stdout
     except Exception:
-        return True
+        return None
     if "fatal:" in out:
-        return True
-    return any(
-        Path(ln[3:].strip().strip('"')).suffix.lower() in CODE_EXT
-        for ln in out.splitlines()
-    )
+        return None
+    return {ln[3:].strip().strip('"') for ln in out.splitlines() if ln.strip()}
 
 
-def stale_pointers(root: Path, conv_dir: Path) -> list[str]:
+def stale_pointers(root: Path, conv_dir: Path, changed) -> list[str]:
+    """Cheap existence check on every entry; the expensive symbol scan (read+regex)
+    runs ONLY for pointers whose target file changed this session — Stop cost scales
+    with the change, not with doc size (which grows over a project's life). Full
+    sweep stays available via /wook-conventions."""
     stale = []
     for doc in sorted(conv_dir.glob("*.md")):
         for line in doc.read_text(encoding="utf-8").splitlines():
@@ -74,10 +96,13 @@ def stale_pointers(root: Path, conv_dir: Path) -> list[str]:
             if not path or not sym:
                 continue
             f = root / path
+            if not f.is_file():
+                stale.append(f"{doc.name}: {ptr}")
+                continue
+            if changed is not None and path not in changed:
+                continue  # unchanged target -> skip the expensive scan
             try:
-                ok = f.is_file() and re.search(
-                    rf"\b{re.escape(sym)}\b", f.read_text(encoding="utf-8")
-                )
+                ok = re.search(rf"\b{re.escape(sym)}\b", f.read_text(encoding="utf-8"))
             except Exception:
                 ok = False
             if not ok:
@@ -93,10 +118,15 @@ def main() -> int:
 
     cwd = Path(event.get("cwd") or os.getcwd())
     root, conv_dir = find_conventions_dir(cwd)
-    if conv_dir is None or not code_changed(root):
+    if conv_dir is None:
         return 0
+    changed = changed_paths(root)
+    if changed is not None and not any(
+        Path(p).suffix.lower() in CODE_EXT for p in changed
+    ):
+        return 0  # no code change -> nothing to re-verify
 
-    stale = stale_pointers(root, conv_dir)
+    stale = stale_pointers(root, conv_dir, changed)
     if not stale:
         return 0
 

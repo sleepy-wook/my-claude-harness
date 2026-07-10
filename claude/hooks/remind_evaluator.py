@@ -1,27 +1,29 @@
 #!/usr/bin/env python3
-"""Stop hook: remind to run the INDEPENDENT evaluator after a real code change.
+"""PostToolUse hook: after a git commit, remind ONCE to run the independent evaluator.
 
-The problem this solves: the deep, domain-appropriate evaluation lives in the
-`wook-evaluator` subagent (the only thing that can drive a browser via Playwright
-MCP, hit an API, run a query, etc.) — but that subagent is invoked by *choice*, so
-on a busy turn it gets forgotten even after a sizable change. The deterministic
-Stop gate can only run shell checks; it cannot drive an MCP/browser evaluation.
+Why commit-time, not Stop-time: the old Stop version keyed on a dirty tree, so it
+nagged EVERY turn while work was uncommitted — pushing a 2-3 minute evaluator
+dispatch into every wrap-up. A commit is the deliberate "this is a unit" moment
+(same reasoning as the commit gate, #16), so the nudge fires exactly once there,
+and only when the commit is big enough to plausibly be non-trivial. Small commits
+stay silent (success is silent; the developer still judges trivial-vs-not — this
+only removes "forgot", it never forces).
 
-So this hook is the deterministic *reminder*: when code changed this turn, it nudges
-the author to dispatch the independent evaluator for anything non-trivial — the
-author still judges trivial-vs-not (we do NOT mechanically force it), but "forgot"
-is removed. Non-blocking (systemMessage), never blocks the stop. Tailors the hint to
-the domain that changed (frontend → Playwright MCP visual check).
-
-Activation: a `.claude/` dir exists (cwd or ancestor = harness-aware project) AND
-code changed this turn. Any error => silent allow.
+Activation: tool is Bash, the command ran a `git commit`, HEAD is a fresh commit
+(committed within the last 5 minutes — a denied/failed commit leaves HEAD stale),
+a `.claude/` dir exists, and the commit changed >= MIN_CODE_LINES lines of code.
+Non-blocking (systemMessage). Any error => silent.
 """
 
 import json
 import os
+import re
 import subprocess
 import sys
+import time
 from pathlib import Path
+
+MIN_CODE_LINES = 30  # below this, the commit is presumed trivial -> stay silent
 
 CODE_EXT = {
     ".py",
@@ -79,25 +81,35 @@ def find_claude_root(start: Path) -> Path | None:
     return None
 
 
-def changed_code_exts(root: Path) -> set[str]:
-    try:
-        out = subprocess.run(
-            ["git", "status", "--porcelain"],
-            cwd=str(root),
-            capture_output=True,
-            text=True,
-            timeout=20,
-        ).stdout
-    except Exception:
-        return set()
-    if "fatal:" in out:
-        return set()
-    exts = set()
-    for ln in out.splitlines():
-        suf = Path(ln[3:].strip().strip('"')).suffix.lower()
-        if suf in CODE_EXT:
-            exts.add(suf)
-    return exts
+def git(root: Path, *args: str) -> str:
+    return subprocess.run(
+        ["git", *args], cwd=str(root), capture_output=True, text=True, timeout=20
+    ).stdout
+
+
+def head_is_fresh(root: Path) -> bool:
+    """True if HEAD was committed in the last 5 min — i.e. this command really
+    produced a commit (a denied/failed commit leaves an older HEAD)."""
+    ts = git(root, "log", "-1", "--format=%ct").strip()
+    return ts.isdigit() and (time.time() - int(ts)) < 300
+
+
+def commit_code_stats(root: Path):
+    """(code lines changed, set of code exts) for the HEAD commit."""
+    lines, exts = 0, set()
+    for row in git(root, "show", "--numstat", "--format=", "HEAD").splitlines():
+        parts = row.split("\t")
+        if len(parts) != 3:
+            continue
+        ins, dels, path = parts
+        suf = Path(path.strip().strip('"')).suffix.lower()
+        if suf not in CODE_EXT:
+            continue
+        exts.add(suf)
+        for n in (ins, dels):
+            if n.isdigit():
+                lines += int(n)
+    return lines, exts
 
 
 def main() -> int:
@@ -106,26 +118,34 @@ def main() -> int:
     except Exception:
         return 0
 
+    command = (event.get("tool_input") or {}).get("command") or ""
+    if not re.search(r"\bgit\s+commit\b", command):
+        return 0  # not a commit -> silent
+
     cwd = Path(event.get("cwd") or os.getcwd())
     root = find_claude_root(cwd)
     if root is None:
         return 0  # not a harness-aware project
 
-    exts = changed_code_exts(root)
-    if not exts:
-        return 0  # no code change this turn
+    try:
+        if not head_is_fresh(root):
+            return 0  # the commit didn't actually land
+        lines, exts = commit_code_stats(root)
+    except Exception:
+        return 0
+    if lines < MIN_CODE_LINES:
+        return 0  # presumed trivial -> silent
 
     msg = (
-        "You changed code this turn. For anything beyond a trivial edit, do NOT grade "
-        "your own work — dispatch the INDEPENDENT evaluator (the wook-evaluator subagent, "
-        "e.g. via /wook-evaluate) to verify it in a domain-appropriate way before calling "
-        "it done. (You judge trivial-vs-not; skip only if truly trivial.)"
+        f"This commit changed ~{lines} lines of code. For a change this size, do NOT "
+        "grade your own work — consider dispatching the INDEPENDENT evaluator "
+        "(wook-evaluator, e.g. via /wook-evaluate) to verify it in a domain-appropriate "
+        "way before calling it done. (You still judge trivial-vs-not.)"
     )
     if exts & FRONTEND_EXT:
         msg += (
             " Frontend changed: have the evaluator drive the Playwright MCP to actually "
-            "VIEW the UI (render, key interactions, console errors) — not just check that "
-            "commands exit 0."
+            "VIEW the UI (render, key interactions, console errors) — not just exit codes."
         )
 
     sys.stdout.write(json.dumps({"systemMessage": msg}))
