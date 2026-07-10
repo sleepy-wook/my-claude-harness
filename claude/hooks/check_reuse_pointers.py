@@ -56,7 +56,8 @@ def find_index_dir(start: Path):
     return None, None
 
 
-def code_changed(root: Path) -> bool:
+def changed_paths(root: Path):
+    """Changed file paths from git status; None = unknown (fail open to full scan)."""
     try:
         out = subprocess.run(
             ["git", "status", "--porcelain"],
@@ -66,16 +67,18 @@ def code_changed(root: Path) -> bool:
             timeout=20,
         ).stdout
     except Exception:
-        return True
+        return None
     if "fatal:" in out:
-        return True
-    return any(
-        Path(ln[3:].strip().strip('"')).suffix.lower() in CODE_EXT
-        for ln in out.splitlines()
-    )
+        return None
+    return {ln[3:].strip().strip('"') for ln in out.splitlines() if ln.strip()}
 
 
-def stale_pointers(root: Path, index_dir: Path) -> list[str]:
+def stale_pointers(root: Path, index_dir: Path, changed) -> list[str]:
+    """Cheap existence check on every entry; the expensive symbol scan (read+regex)
+    runs ONLY for pointers whose target file changed this session. A pointer goes
+    stale when its target changes/moves, so scoping keeps detection while making
+    Stop cost proportional to the change — not to catalog size (which grows forever).
+    Full sweep stays available via /wook-index."""
     stale = []
     for man in sorted(index_dir.glob("*.md")):
         for line in man.read_text(encoding="utf-8").splitlines():
@@ -85,10 +88,13 @@ def stale_pointers(root: Path, index_dir: Path) -> list[str]:
             ptr = line.split("·")[-1].strip()
             path, _, sym = ptr.rpartition(":")
             f = root / path
+            if not f.is_file():
+                stale.append(f"{man.name}: {ptr}")
+                continue
+            if changed is not None and path not in changed:
+                continue  # unchanged target -> skip the expensive scan
             try:
-                ok = f.is_file() and re.search(
-                    rf"\b{re.escape(sym)}\b", f.read_text(encoding="utf-8")
-                )
+                ok = re.search(rf"\b{re.escape(sym)}\b", f.read_text(encoding="utf-8"))
             except Exception:
                 ok = False
             if not ok:
@@ -104,10 +110,15 @@ def main() -> int:
 
     cwd = Path(event.get("cwd") or os.getcwd())
     root, index_dir = find_index_dir(cwd)
-    if index_dir is None or not code_changed(root):
+    if index_dir is None:
         return 0
+    changed = changed_paths(root)
+    if changed is not None and not any(
+        Path(p).suffix.lower() in CODE_EXT for p in changed
+    ):
+        return 0  # no code change -> nothing to re-verify
 
-    stale = stale_pointers(root, index_dir)
+    stale = stale_pointers(root, index_dir, changed)
     if not stale:
         return 0
 
