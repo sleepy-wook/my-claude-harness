@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Behavioral tests for the independent-evaluator changes (reminder hook + tool allowlist).
+"""Behavioral tests for the independent-evaluator pieces (reminder hook + allowlist).
 
-Note: the actual Playwright-MCP visual evaluation can't be unit-tested here (needs a live
-MCP server + browser + app) — that part is verified by a live trial after deploy. These
-tests cover the deterministic pieces: the reminder hook and the evaluator's tool allowlist.
-Run from the repo root. Exit 0 = all pass.
+remind_evaluator is a PostToolUse(Bash) hook now: it fires ONCE after a real
+`git commit`, only when the commit changed >= 30 code lines (below = presumed
+trivial, silent). The old Stop version nagged every turn on a dirty tree.
+Playwright-MCP evaluation itself can't be unit-tested here (needs live MCP);
+these cover the deterministic pieces. Run from the repo root. Exit 0 = all pass.
 """
 
 import json
@@ -27,61 +28,77 @@ def check(name, got, want):
     print(f"  [{'PASS' if ok else 'FAIL'}] {name}: got={got!r} want={want!r}")
 
 
-def run(script, cwd):
+def run_hook(cwd, command):
+    ev = {"cwd": cwd, "tool_input": {"command": command}}
     p = subprocess.run(
-        [sys.executable, script],
-        input=json.dumps({"cwd": cwd}),
-        capture_output=True,
-        text=True,
+        [sys.executable, REMIND], input=json.dumps(ev), capture_output=True, text=True
     )
     return p.stdout.strip()
 
 
-def gitrepo(claude=True):
+def repo_with_commit(fname, n_lines, claude=True):
+    """Throwaway git repo whose HEAD is a fresh commit touching fname (n_lines)."""
     d = tempfile.mkdtemp(prefix="eval_")
     subprocess.run("git init -q", cwd=d, shell=True, check=True)
     if claude:
         (Path(d) / ".claude").mkdir()
+    (Path(d) / fname).write_text(
+        "\n".join(f"x{i} = {i}" for i in range(n_lines)) + "\n", encoding="utf-8"
+    )
+    subprocess.run(f"git add -A", cwd=d, shell=True, check=True)
+    subprocess.run(
+        "git -c user.email=t@t -c user.name=t commit -q -m x",
+        cwd=d,
+        shell=True,
+        check=True,
+    )
     return d
 
 
-print("Test — remind_evaluator hook")
-# A: frontend file changed -> reminder mentions Playwright
-d = gitrepo()
-(Path(d) / "app.tsx").write_text("export const A = () => <div/>;\n")
-out = run(REMIND, d)
+print("Test — remind_evaluator hook (commit-time, size-gated)")
+# A: big frontend commit -> reminds + Playwright
+out = run_hook(repo_with_commit("app.tsx", 40), 'git commit -m "x"')
 check(
-    "A frontend: reminds + Playwright",
+    "A big frontend commit: reminds + Playwright",
     "wook-evaluator" in out and "Playwright" in out,
     True,
 )
 
-# B: backend file changed -> reminder, but no Playwright clause
-d = gitrepo()
-(Path(d) / "api.py").write_text("def handler():\n    return 1\n")
-out = run(REMIND, d)
+# B: big backend commit -> reminds, no Playwright clause
+out = run_hook(repo_with_commit("api.py", 40), 'git commit -m "x"')
 check(
-    "B backend: reminds, no Playwright",
+    "B big backend commit: reminds, no Playwright",
     "wook-evaluator" in out and "Playwright" not in out,
     True,
 )
 
-# C: no code change (only a .md under .claude) -> silent
-d = gitrepo()
-(Path(d) / ".claude" / "notes.md").write_text("# notes\n")
-check("C no code change: silent", run(REMIND, d), "")
+# C: tiny commit (< 30 code lines) -> silent (presumed trivial)
+check(
+    "C tiny commit: silent",
+    run_hook(repo_with_commit("api.py", 3), 'git commit -m "x"'),
+    "",
+)
 
-# D: code changed but project is not harness-aware (no .claude) -> silent
-d = gitrepo(claude=False)
-(Path(d) / "app.py").write_text("x = 1\n")
-check("D no .claude: silent", run(REMIND, d), "")
+# D: non-commit command -> silent even with a big fresh commit
+check(
+    "D non-commit command: silent",
+    run_hook(repo_with_commit("api.py", 40), "git status"),
+    "",
+)
+
+# E: big commit but not harness-aware (no .claude) -> silent
+check(
+    "E no .claude: silent",
+    run_hook(repo_with_commit("api.py", 40, claude=False), 'git commit -m "x"'),
+    "",
+)
 
 print("Test — evaluator tool allowlist")
 txt = EVALUATOR.read_text(encoding="utf-8")
 tools_line = next((ln for ln in txt.splitlines() if ln.startswith("tools:")), "")
-check("E1 has Playwright MCP", "mcp__playwright__*" in tools_line, True)
+check("F1 has Playwright MCP", "mcp__playwright__*" in tools_line, True)
 check(
-    "E2 excludes Edit/Write/WebFetch",
+    "F2 excludes Edit/Write/WebFetch",
     not any(t in tools_line for t in ("Edit", "Write", "WebFetch")),
     True,
 )

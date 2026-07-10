@@ -97,7 +97,7 @@ python deploy.py --target=codex     # ~/.codex 로: hooks.json·skills/·AGENTS.
   - **backend** → 엔드포인트 호출, 상태/응답/로그
   - **db** → 쿼리로 스키마·데이터
   - → `VERDICT: PASS | FAIL | INCONCLUSIVE` 를 **그대로** 전달(거짓 PASS 금지; 못 돌리면 INCONCLUSIVE).
-- **자동 리마인더:** 코드를 바꾼 턴이면 Stop hook이 "비사소면 독립 평가자 돌려"라고 알린다(사소 판단은 본인 몫).
+- **자동 리마인더:** 커밋 직후 1회, 커밋이 충분히 클 때만(≥30줄) "독립 평가자 돌려"라고 알린다(사소 판단은 본인 몫 — 매 턴 잔소리 X).
 - **관련:** `wook-evaluator`(agent)는 도구가 `Bash·Read·Grep·Glob·Playwright MCP`로 제한 — **코드 못 고침**(판정만), 빌트인 브라우저 대신 Playwright MCP만.
 
 <a id="wook-onboard"></a>
@@ -157,9 +157,9 @@ hook은 생명주기 특정 시점에 **반드시** 실행되는 스크립트다
 | `PreToolUse` (Edit\|Write) | 보호 경로 deny(.git·키·시크릿) | `guard_paths.py` |
 | `PostToolUse` (Edit\|Write) | `.py` 자동 포맷(ruff) | `format_py.py` |
 | `PreToolUse` (Bash) | 커밋 게이트 — `git commit` 시 recipe 검증, 실패면 deny | `gate_on_commit.py` |
-| `Stop` | 재사용 스테일 포인터 알림 | `check_reuse_pointers.py` |
-| `Stop` | 컨벤션 스테일 포인터 알림 | `check_convention_pointers.py` |
-| `Stop` | "독립 평가자 돌려" 리마인더 | `remind_evaluator.py` |
+| `PostToolUse` (Bash) | 커밋 직후 1회, 큰 커밋(≥30줄)일 때만 "독립 평가자 돌려" 리마인더 | `remind_evaluator.py` |
+| `Stop` | 재사용 스테일 포인터 알림(변경 파일에 걸린 것만 스캔) | `check_reuse_pointers.py` |
+| `Stop` | 컨벤션 스테일 포인터 알림(변경 파일에 걸린 것만 스캔) | `check_convention_pointers.py` |
 
 모든 스크립트는 문제가 생겨도 작업을 막지 않도록 안전하게 빠진다. 차단은 **의도된 곳**에서만 — 보호 경로 deny,
 그리고 **커밋 게이트**(`git commit` 시 recipe 미통과면 커밋 deny; `--no-verify`로 우회). 검증은 매 턴이 아니라

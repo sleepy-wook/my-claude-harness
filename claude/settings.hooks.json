@@ -38,6 +38,18 @@
             "statusMessage": "ruff format"
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": ["{HOOKS_DIR}/remind_evaluator.py"],
+            "timeout": 20,
+            "statusMessage": "evaluator reminder"
+          }
+        ]
       }
     ],
     "UserPromptSubmit": [
@@ -83,13 +95,6 @@
             "args": ["{HOOKS_DIR}/check_convention_pointers.py"],
             "timeout": 30,
             "statusMessage": "convention pointer check"
-          },
-          {
-            "type": "command",
-            "command": "python",
-            "args": ["{HOOKS_DIR}/remind_evaluator.py"],
-            "timeout": 20,
-            "statusMessage": "evaluator reminder"
           }
         ]
       }
