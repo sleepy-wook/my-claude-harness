@@ -90,6 +90,7 @@
 | 2026-07-07 | 게이트 레시피 = **staged-scoped lint + build 금지**(사소한 커밋도 느림 해소) | 형욱 통증: 1줄 수정 커밋마다 eslint(전체)+build 돌아 느림. 원인 = 레시피가 우리 `/wook-plan` 규칙(빠른 것만) 위반 + **frontend 예시부터 whole-repo 글롭**(`stylelint "**/*"`)이라 새 프로젝트마다 느린 레시피 태어남. 수정: 예시를 `git diff --cached ... \| xargs stylelint`(스테이징 파일만)로, `/wook-plan` 스텝3에 "lint는 바뀐 파일만 scope, `build`는 게이트 절대 금지→`/wook-evaluate`" 명시 + stale 문구("매 턴"→"커밋마다") 정정. selfcheck 10 md·deploy --check 0 |
 | 2026-07-07 | 누적-위험 감사 → 포인터 검사 **변경 파일 scope** + core-rules 캡 경고 | 형욱: "대화마다 무한히 쌓이는 잠재 위험 봐라". 감사 결과 — R1(🔴) 포인터 검사 훅 2개가 매 Stop마다 카탈로그 **전체 풀스캔**(엔트리마다 대상 파일 read+regex; 카탈로그는 무한 성장 → 마무리가 선형으로 느려짐). R3(🟡) core-rules 9000자 캡에서 **조용히 잘림**. 수정: 비싼 심볼 스캔은 **변경된 파일에 걸린 포인터만**(존재 확인은 전 엔트리 유지 — 삭제 감지 보존; 풀 스윕은 /wook-index·/wook-conventions 몫), selfcheck에 core-rules >8000자 경고(5b). R2(remind_evaluator 매턴 잔소리→evaluator 남용)는 **형욱 결정 대기**. test_conventions 6/6·test_evaluator 6/6·deploy --check 0 |
 | 2026-07-07 | 평가자 리마인더 = **Stop(매 턴) → 커밋 직후 1회 + 크기 임계(≥30줄)** | R2 해소. 형욱: "삭제 전에 개선안 고민 후 진행". Stop+dirty-tree 버전은 미커밋 상태면 매 턴 "evaluator 불러" → 마무리마다 2~3분 디스패치 유도(마무리 느림의 최대 원인). 삭제 대신 **커밋 게이트와 같은 원리로 이전**: PostToolUse(Bash)가 `git commit` 후 HEAD 신선(<5분)+커밋의 코드 변경 ≥30줄일 때만 1회 알림(작은 커밋=침묵, "성공은 침묵" 원칙·리서치 Shankar hint-hook 패턴). 상태 저장 없음(커밋 자체가 상태). Stop 훅은 2개(포인터 검사)로 축소. test_evaluator 7/7 재작성·전 테스트 회귀 green |
+| 2026-07-08 | #19 `/wook-design` — 디자인 스킬 팩(**웹/앱 bimodal** + references/ 계층) | 형욱 리서치 문서 기반: 생태계 빈자리 = 데스크톱 랜딩(MengTo)·네이티브 앱·게임 아키텍처 사이의 "웹 기술 모바일 비율 인터랙티브 UI". 4개 repo 병렬 발췌(bergside 골격·Quality Gates / ceorkm 5단계·60/30/10·8pt·44px / openai game-studio DOM 오버레이 HUD·thin scenes·안티패턴(버전중립, v4 안전) / MengTo specs-beat-vibes·variants>rerolls·미감 서술 문체). 결정: 스킬 2개 대신 **1개+웹/앱 모드**(MengTo 프리셋 트리거 충돌 교훈), SKILL.md 얇게+references/{shared,web,app} 6파일(ceorkm 149줄 뚱뚱 반면교사), **토큰은 conventions가 소유**(스킬은 소비 — sandbox와 동일 원칙), 검증은 sandbox+evaluator로 연결. deploy가 중첩 references/ 배포함 확인. selfcheck 11 md·deploy --check 0 |
 | 2026-07-07 | #18 `/wook-sandbox` — 격리 제작→써보고→**졸업** | 형욱 실제 통증("에이전트가 대충 만든 걸 실제 프로젝트에 바로 이식") 기반 = Ratchet 통과(투기 아님). **on-demand 스킬**(훅 아님→매 턴 비용 0)이라 과설계 위험 회피. `sandbox/<이름>/`(repo 루트, **gitignore**)에 그 조각만 목데이터로 제작→사람이 직접 써봄(프론트=dev서버+Playwright, 백=curl)→승인 시 실제 경로로 **이동(졸업)**+reuse-index 갱신→정상 evaluator/게이트. 프론트는 **프로젝트 실제 팔레트/토큰 import**(팔레트는 sandbox 소유 X, conventions 소유). plan/evaluator와 직교. selfcheck 10 md·deploy --check 0. 행동 닷푸드는 실제 FE/BE 프로젝트 몫(이 repo는 앱 아님) |
 
 ---
@@ -398,7 +399,10 @@ LLM 평가자(서브에이전트)만 가능(결정론 셸 게이트는 브라우
    ├─ wook-map/SKILL.md               # #13 /wook-map (프로젝트 지도 생성)
    ├─ wook-onboard/SKILL.md           # #14 /wook-onboard (기존 repo 한 방 온보딩)
    ├─ wook-audit/SKILL.md             # #17 /wook-audit (전체 트리 상시 감사 원장)
-   └─ wook-sandbox/SKILL.md           # #18 /wook-sandbox (격리 제작→써보고→졸업)
+   ├─ wook-sandbox/SKILL.md           # #18 /wook-sandbox (격리 제작→써보고→졸업)
+   └─ wook-design/                    # #19 /wook-design (웹/앱 bimodal 디자인 팩)
+      ├─ SKILL.md                     #   얇은 입구: 모드 판별+프로세스+Quality Gates
+      └─ references/{shared,web,app}/ #   수치 룰·미감 서술법·웹 레이아웃·앱 비율·게임 UI
 ```
 
 ---
