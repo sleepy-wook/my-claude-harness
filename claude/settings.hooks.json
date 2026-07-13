@@ -14,14 +14,14 @@
         ]
       },
       {
-        "matcher": "Bash",
+        "matcher": "Bash|PowerShell",
         "hooks": [
           {
             "type": "command",
             "command": "python",
-            "args": ["{HOOKS_DIR}/gate_on_commit.py"],
-            "timeout": 300,
-            "statusMessage": "commit gate"
+            "args": ["{HOOKS_DIR}/guard_bash.py"],
+            "timeout": 15,
+            "statusMessage": "bash guard"
           }
         ]
       }
@@ -58,9 +58,9 @@
           {
             "type": "command",
             "command": "python",
-            "args": ["{HOOKS_DIR}/inject_core_rules.py"],
+            "args": ["{HOOKS_DIR}/inject_plan_pointer.py"],
             "timeout": 15,
-            "statusMessage": "inject core-rules"
+            "statusMessage": "plan pointer"
           },
           {
             "type": "command",
@@ -75,26 +75,6 @@
             "args": ["{HOOKS_DIR}/inject_convention_pointer.py"],
             "timeout": 15,
             "statusMessage": "convention pointer"
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python",
-            "args": ["{HOOKS_DIR}/check_reuse_pointers.py"],
-            "timeout": 30,
-            "statusMessage": "reuse pointer check"
-          },
-          {
-            "type": "command",
-            "command": "python",
-            "args": ["{HOOKS_DIR}/check_convention_pointers.py"],
-            "timeout": 30,
-            "statusMessage": "convention pointer check"
           }
         ]
       }

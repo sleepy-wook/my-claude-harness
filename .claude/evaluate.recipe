@@ -1,4 +1,6 @@
 # claude-harness 자기검증 레시피 (이 파일 존재 = 커밋 게이트 ON)
-# name: shell 명령  (exit 0 = 통과). 커밋 게이트(gate_on_commit)와 /wook-evaluate가 이걸 실행한다.
+# name: shell 명령 (exit 0 = 통과). 게이트는 .git/hooks/pre-commit(gate_runner.py)이 실행하고,
+# /wook-evaluate도 같은 기준을 쓴다. 비활성화: .claude/evaluate-off 생성. 우회: --no-verify.
 selfcheck: python tools/selfcheck.py
+tests:     python -B tools/run_tests.py
 deploy:    python deploy.py --check

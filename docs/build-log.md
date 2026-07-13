@@ -82,17 +82,25 @@
 | 2026-06-15 | deploy `copy_tree` 실쓰기 버그 수정(`write_bytes()` 인자 누락) | bytes 분기가 bound method를 인자 없이 호출 → *파일 실제 변경 시만* 크래시(`--check`만 돈 게이트가 놓침). 양 경로 직접 write로. (main에서도 병렬 수정 → 머지 시 통합, 회귀 테스트 추가) |
 | 2026-06-15 | 게이트가 레시피를 **bash로 실행**(Windows cmd.exe 탈출) | `shell=True`→Windows는 cmd.exe라 `!`·glob 등 POSIX 문법 깨짐(test_conventions 4b 적발). `bash -c`로(없으면 폴백). 하네스가 이미 Git Bash 가정. **커밋 게이트(`gate_on_commit`)에 이식** |
 | 2026-06-15 | `/wook-plan`이 recipe를 **누적 금지·작고 빠른 set으로 수렴** | 형욱 발견: plan마다 recipe에 기능 기준이 *덧붙어* 무한 비대 → 게이트가 점점 느려짐(1줄 수정에도 무거운 더미 실행). 수정: 스킬이 기준을 *테스트로* 표현(표준 `pytest` 줄이 커버), recipe엔 표준 빠른 검사만, 느린/시각 검사는 `/wook-evaluate`로, 쓸 때 cruft prune. "merge로 쌓기" 폐기 |
-| 2026-06-15 | #16 **자동 게이트 = Stop(매 턴) → 커밋 게이트(PreToolUse `git commit`)** | 형욱: 결정론 게이트가 *매 턴/자잘한 수정*마다 발동해 너무 잦음(off 끄고 싶을 정도). 줄 수 기준 엄격화는 구멍(1줄 버그 놓침)이라 ✗ → 발동 *granularity*를 커밋(의도적 "한 단위")으로. `gate_on_commit.py`가 `git commit` 가로채 recipe 실행, 실패면 deny(`--no-verify`로 우회). Stop `evaluate_gate.py`+`verified_head`/`code_sig` 전부 **폐기**(삭제). test_gate_on_commit 6/6 |
+| 2026-06-15 | #16 **자동 게이트 = Stop(매 턴) → 커밋 게이트(PreToolUse `git commit`)** | 형욱: 결정론 게이트가 *매 턴/자잘한 수정*마다 발동해 너무 잦음(off 끄고 싶을 정도). 줄 수 기준 엄격화는 구멍(1줄 버그 놓침)이라 ✗ → 발동 *granularity*를 커밋(의도적 "한 단위")으로. `gate_on_commit.py`가 `git commit` 가로채 recipe 실행, 실패면 deny(`--no-verify`로 우회). Stop `evaluate_gate.py`+`verified_head`/`code_sig` 전부 **폐기**(삭제). test_gate_on_commit 6/6 · 메커니즘 → **대체됨**(2026-07-06 #19 git 네이티브 pre-commit; granularity 결정은 유지) |
 | 2026-06-15 | `plan.md` 수명 = **현재 플랜만**(누적 X), 끝난 건 build-log | 형욱 발견: plan.md에 완료 SPEC이 계속 쌓임(recipe도 — 지난 수정으로 처리). plan.md는 *in-flight* 한 개만, `/wook-plan`이 **덮어쓰기**. 영구 기록은 build-log. 주기적/수동 정리 불필요(자동 수렴). 이 repo plan.md를 상시 자기검증 1개로 정리(완료 SPEC 6개 제거) |
-| 2026-06-30 | 커밋 게이트가 **WSL bash를 거부**(Git Bash만 사용) | 형욱 발견: Windows에서 게이트가 매번 실패해 `--no-verify` 상시 사용. 원인 — WSL 깔린 Windows는 `shutil.which("bash")`가 `C:\Windows\System32\bash.exe`(=WSL 진입점)를 잡아 recipe를 리눅스 fs에서 실행(`python`·`C:\` 경로 부재)→전부 실패. `find_bash()`가 `%WINDIR%` 아래(WSL 스텁) 스킵하고 Git for Windows(PATH/표준경로/`git --exec-path`) 우선, 없으면 셸 폴백. Linux/Mac 무영향(`/usr/bin/bash` 그대로). test_gate_on_commit 7/7(G: System32 스텁 거부) |
+| 2026-06-30 | 커밋 게이트가 **WSL bash를 거부**(Git Bash만 사용) | 형욱 발견: Windows에서 게이트가 매번 실패해 `--no-verify` 상시 사용. 원인 — WSL 깔린 Windows는 `shutil.which("bash")`가 `C:\Windows\System32\bash.exe`(=WSL 진입점)를 잡아 recipe를 리눅스 fs에서 실행(`python`·`C:\` 경로 부재)→전부 실패. `find_bash()`가 `%WINDIR%` 아래(WSL 스텁) 스킵하고 Git for Windows(PATH/표준경로/`git --exec-path`) 우선, 없으면 셸 폴백. Linux/Mac 무영향(`/usr/bin/bash` 그대로). test_gate_on_commit 7/7(G: System32 스텁 거부) · **v2에서 `find_bash()`를 `gate_runner.py`로 이식**(#19) |
 | 2026-06-30 | #17 `/wook-audit` — 전체 트리 **상시 감사 원장**(`.claude/audit/`) | 형욱 요청: 디렉토리 전체를 파일 하나하나 읽어 `.claude/audit/`에 살아있는 md 2개 유지 — `coverage.md`(트리+체크박스, ⬜→✅로 **재개** 장치) + `findings.md`(관찰된 규칙·스타일·문제 누적). 결정: **감사·기록만**(코드 안 고침)·**descriptive**(conventions=처방과 분리, 승격은 사람 몫)·대형 repo는 subagent fan-out+배치+남은 수 보고. onboard(one-shot 부트스트랩)·code-review(diff)와 구분. 닷푸드: 이 repo `tools/`(6파일) 실제 감사 → 원장 2개 생성, 발견 4건(check() 중복·시그니처 불일치, tools/ write_text encoding 누락 미가드, selfcheck Stop-gate stale 주석 등). selfcheck 9 md·deploy --check 0 |
 | 2026-07-07 | 6~7월 트렌드 리서치 → **결론: 추가보다 절제**(우리 구조는 트렌드 정중앙) | deep-research fan-out(주장 75개·적대검증 33/35 생존). 신조어 계보 prompt→context→harness(Trivedy 3월, Böckeler 4/2 정식화)→**loop engineering**(6월 초). 핵심: 커밋-타임 결정론 게이트(Shankar, block-at-submit+비차단 hint) = 우리가 방금 한 것과 동일 / PGE 분리 Anthropic 지지 / 서브에이전트=컨텍스트 방화벽(역할 페르소나는 실패) / **Ratchet 원칙**(실패 뒤에만 규칙 추가, LLM생성 규칙은 성능 해침-ETH 2602.11988). 우리 하네스 평가 = 뒤처진 것 없음. **wook-reviewer 보류 재확인**(역할 서브에이전트 반패턴). 유일 저비용 추가후보 = 훅 메시지를 LLM자기교정형으로. 문서 미저장(형욱 토큰 절약 위해 채팅 합성으로 종료) |
 | 2026-07-07 | 게이트 레시피 = **staged-scoped lint + build 금지**(사소한 커밋도 느림 해소) | 형욱 통증: 1줄 수정 커밋마다 eslint(전체)+build 돌아 느림. 원인 = 레시피가 우리 `/wook-plan` 규칙(빠른 것만) 위반 + **frontend 예시부터 whole-repo 글롭**(`stylelint "**/*"`)이라 새 프로젝트마다 느린 레시피 태어남. 수정: 예시를 `git diff --cached ... \| xargs stylelint`(스테이징 파일만)로, `/wook-plan` 스텝3에 "lint는 바뀐 파일만 scope, `build`는 게이트 절대 금지→`/wook-evaluate`" 명시 + stale 문구("매 턴"→"커밋마다") 정정. selfcheck 10 md·deploy --check 0 |
-| 2026-07-07 | 누적-위험 감사 → 포인터 검사 **변경 파일 scope** + core-rules 캡 경고 | 형욱: "대화마다 무한히 쌓이는 잠재 위험 봐라". 감사 결과 — R1(🔴) 포인터 검사 훅 2개가 매 Stop마다 카탈로그 **전체 풀스캔**(엔트리마다 대상 파일 read+regex; 카탈로그는 무한 성장 → 마무리가 선형으로 느려짐). R3(🟡) core-rules 9000자 캡에서 **조용히 잘림**. 수정: 비싼 심볼 스캔은 **변경된 파일에 걸린 포인터만**(존재 확인은 전 엔트리 유지 — 삭제 감지 보존; 풀 스윕은 /wook-index·/wook-conventions 몫), selfcheck에 core-rules >8000자 경고(5b). R2(remind_evaluator 매턴 잔소리→evaluator 남용)는 **형욱 결정 대기**. test_conventions 6/6·test_evaluator 6/6·deploy --check 0 |
-| 2026-07-07 | 평가자 리마인더 = **Stop(매 턴) → 커밋 직후 1회 + 크기 임계(≥30줄)** | R2 해소. 형욱: "삭제 전에 개선안 고민 후 진행". Stop+dirty-tree 버전은 미커밋 상태면 매 턴 "evaluator 불러" → 마무리마다 2~3분 디스패치 유도(마무리 느림의 최대 원인). 삭제 대신 **커밋 게이트와 같은 원리로 이전**: PostToolUse(Bash)가 `git commit` 후 HEAD 신선(<5분)+커밋의 코드 변경 ≥30줄일 때만 1회 알림(작은 커밋=침묵, "성공은 침묵" 원칙·리서치 Shankar hint-hook 패턴). 상태 저장 없음(커밋 자체가 상태). Stop 훅은 2개(포인터 검사)로 축소. test_evaluator 7/7 재작성·전 테스트 회귀 green |
-| 2026-07-08 | #20 `/wook-palette` — 대화형 팔레트 생성 + **고정-UI 팔레트 HTML**(WCAG 계산 내장) | 형욱 요청 + #19 평가에서 짚은 🔴 그린필드 토큰 공백/🟡 검증 turnkey를 정확히 메움(ratchet 통과). 티키타카로 무드 수집 → variant 후보 N개 → **결정론 스크립트 `gen_palette.py`**(bash 실행=컨텍스트 미소비, Agent Skills 원칙)가 고정-UI HTML 생성: 후보별 스와치+라이브 프리뷰+**WCAG 대비 PASS/FAIL 계산**(눈이 아니라 수치). 확정 시 `--css N`로 tokens.css turnkey 추출 + conventions가 그걸 가리킴(값은 토큰, 문서는 규칙). 별도 스킬(생성=대화형 vs 기록=문서, conventions와 직교). 닷푸드: 후보 4개 생성, evaluator가 실브라우저 렌더+대비 독립 재계산(소수점 일치), 일부러 위험하게 만든 neon-void의 textMuted/surface 2.77:1·accentInk/accent 4.18:1을 **FAIL 정확 표시** 확인. selfcheck 12 md·deploy --check 0 |
-| 2026-07-08 | #19 `/wook-design` — 디자인 스킬 팩(**웹/앱 bimodal** + references/ 계층) | 형욱 리서치 문서 기반: 생태계 빈자리 = 데스크톱 랜딩(MengTo)·네이티브 앱·게임 아키텍처 사이의 "웹 기술 모바일 비율 인터랙티브 UI". 4개 repo 병렬 발췌(bergside 골격·Quality Gates / ceorkm 5단계·60/30/10·8pt·44px / openai game-studio DOM 오버레이 HUD·thin scenes·안티패턴(버전중립, v4 안전) / MengTo specs-beat-vibes·variants>rerolls·미감 서술 문체). 결정: 스킬 2개 대신 **1개+웹/앱 모드**(MengTo 프리셋 트리거 충돌 교훈), SKILL.md 얇게+references/{shared,web,app} 6파일(ceorkm 149줄 뚱뚱 반면교사), **토큰은 conventions가 소유**(스킬은 소비 — sandbox와 동일 원칙), 검증은 sandbox+evaluator로 연결. deploy가 중첩 references/ 배포함 확인. selfcheck 11 md·deploy --check 0 |
+| 2026-07-07 | 누적-위험 감사 → 포인터 검사 **변경 파일 scope** + core-rules 캡 경고 | 형욱: "대화마다 무한히 쌓이는 잠재 위험 봐라". 감사 결과 — R1(🔴) 포인터 검사 훅 2개가 매 Stop마다 카탈로그 **전체 풀스캔**(엔트리마다 대상 파일 read+regex; 카탈로그는 무한 성장 → 마무리가 선형으로 느려짐). R3(🟡) core-rules 9000자 캡에서 **조용히 잘림**. 수정: 비싼 심볼 스캔은 **변경된 파일에 걸린 포인터만**(존재 확인은 전 엔트리 유지 — 삭제 감지 보존; 풀 스윕은 /wook-index·/wook-conventions 몫), selfcheck에 core-rules >8000자 경고(5b). R2(remind_evaluator 매턴 잔소리→evaluator 남용)는 **형욱 결정 대기**. test_conventions 6/6·test_evaluator 6/6·deploy --check 0 · → **일부 대체됨**(v2 #19: 포인터 검사 훅 삭제→게이트로 흡수; core-rules 캡 경고는 inject_core_rules 폐기로 무의미해져 제거) |
+| 2026-07-07 | 평가자 리마인더 = **Stop(매 턴) → 커밋 직후 1회 + 크기 임계(≥30줄)** | R2 해소. 형욱: "삭제 전에 개선안 고민 후 진행". Stop+dirty-tree 버전은 미커밋 상태면 매 턴 "evaluator 불러" → 마무리마다 2~3분 디스패치 유도(마무리 느림의 최대 원인). 삭제 대신 **커밋 게이트와 같은 원리로 이전**: PostToolUse(Bash)가 `git commit` 후 HEAD 신선(<5분)+커밋의 코드 변경 ≥30줄일 때만 1회 알림(작은 커밋=침묵, "성공은 침묵" 원칙·리서치 Shankar hint-hook 패턴). 상태 저장 없음(커밋 자체가 상태). Stop 훅은 2개(포인터 검사)로 축소. test_evaluator 7/7 재작성·전 테스트 회귀 green · **v2가 이 버전 그대로 채택**(#19; 포인터 검사가 게이트로 빠져 Stop은 0개가 됨) |
+| 2026-07-08 | #20 `/wook-palette` — 대화형 팔레트 생성 + **고정-UI 팔레트 HTML**(WCAG 계산 내장) | 형욱 요청 + #19 평가에서 짚은 🔴 그린필드 토큰 공백/🟡 검증 turnkey를 정확히 메움(ratchet 통과). 티키타카로 무드 수집 → variant 후보 N개 → **결정론 스크립트 `gen_palette.py`**(bash 실행=컨텍스트 미소비, Agent Skills 원칙)가 고정-UI HTML 생성: 후보별 스와치+라이브 프리뷰+**WCAG 대비 PASS/FAIL 계산**(눈이 아니라 수치). 확정 시 `--css N`로 tokens.css turnkey 추출 + conventions가 그걸 가리킴(값은 토큰, 문서는 규칙). 별도 스킬(생성=대화형 vs 기록=문서, conventions와 직교). 닷푸드: 후보 4개 생성, evaluator가 실브라우저 렌더+대비 독립 재계산(소수점 일치), 일부러 위험하게 만든 neon-void의 textMuted/surface 2.77:1·accentInk/accent 4.18:1을 **FAIL 정확 표시** 확인. selfcheck 12 md·deploy --check 0 · (v2 위에 재배치 — 순수 추가 스킬이라 아키텍처 무관) |
+| 2026-07-08 | #19 `/wook-design` — 디자인 스킬 팩(**웹/앱 bimodal** + references/ 계층) | 형욱 리서치 문서 기반: 생태계 빈자리 = 데스크톱 랜딩(MengTo)·네이티브 앱·게임 아키텍처 사이의 "웹 기술 모바일 비율 인터랙티브 UI". 4개 repo 병렬 발췌(bergside 골격·Quality Gates / ceorkm 5단계·60/30/10·8pt·44px / openai game-studio DOM 오버레이 HUD·thin scenes·안티패턴(버전중립, v4 안전) / MengTo specs-beat-vibes·variants>rerolls·미감 서술 문체). 결정: 스킬 2개 대신 **1개+웹/앱 모드**(MengTo 프리셋 트리거 충돌 교훈), SKILL.md 얇게+references/{shared,web,app} 6파일(ceorkm 149줄 뚱뚱 반면교사), **토큰은 conventions가 소유**(스킬은 소비 — sandbox와 동일 원칙), 검증은 sandbox+evaluator로 연결. deploy가 중첩 references/ 배포함 확인. selfcheck 11 md·deploy --check 0 · (v2 위에 재배치) |
 | 2026-07-07 | #18 `/wook-sandbox` — 격리 제작→써보고→**졸업** | 형욱 실제 통증("에이전트가 대충 만든 걸 실제 프로젝트에 바로 이식") 기반 = Ratchet 통과(투기 아님). **on-demand 스킬**(훅 아님→매 턴 비용 0)이라 과설계 위험 회피. `sandbox/<이름>/`(repo 루트, **gitignore**)에 그 조각만 목데이터로 제작→사람이 직접 써봄(프론트=dev서버+Playwright, 백=curl)→승인 시 실제 경로로 **이동(졸업)**+reuse-index 갱신→정상 evaluator/게이트. 프론트는 **프로젝트 실제 팔레트/토큰 import**(팔레트는 sandbox 소유 X, conventions 소유). plan/evaluator와 직교. selfcheck 10 md·deploy --check 0. 행동 닷푸드는 실제 FE/BE 프로젝트 몫(이 repo는 앱 아님) |
+| 2026-07-06 | **v2 원칙: 검증된/네이티브 운반체 우선** — 2026 중반 트렌드 감사(에이전트 18개 리서치: Anthropic 공식·harness 담론·loop eng.·검증 게이트·spec-driven·context eng.·경쟁 하네스 등 10+3 관점) 반영 | 감사 결론: 철학(결정론 hook·PGE·커밋 게이트)은 업계 컨센서스와 일치, 단 ① 게이트가 자기 자신을 보호 못 함(CI-gaming) ② 손수 만든 메커니즘이 플랫폼 네이티브와 중복. 형욱 승인: "기존 구조 고수보다 검증된 방법 우선". (원격 세션의 07-07 개선들과 병렬 진행 → 아래 #19에서 reconcile) |
+| 2026-07-06 | #19 **커밋 게이트 = git 네이티브 `pre-commit`**(`gate_runner.py` + `install_gate.py`), `gate_on_commit.py` 폐기 | Bash 문자열 파싱은 복합명령/alias 놓치면 조용히 열리고 모든 Bash 호출에 300s 훅. pre-commit은 어느 에이전트든+사람 커밋에도 동일 발동, `--no-verify` 네이티브, Codex 어댑터 절반 불필요. #16의 *granularity(커밋 시점)* 결정은 유지, 메커니즘만 교체. 게이트에 **자기보호**(staged recipe 변경/테스트 삭제 → `GATE_EDIT_OK=1` 요구; GitHub "CI 약화=차단" 가이드) + **stall 감지**(같은 실패 3연속 → "사람에게") + 포인터 신선도 경고 통합. **원격 `find_bash()` WSL 수정을 그대로 이식**(2026-06-30 항목) |
+| 2026-07-06 | **core-rules 운반체 = `~/.claude/CLAUDE.md`** marked block(deploy 렌더), `inject_core_rules.py` 폐기 | 매 턴 additionalContext 주입은 transcript에 누적(~700토큰×턴). CLAUDE.md는 1회 로드·프롬프트 캐시·compaction 후 재주입이 공식 문서화된 운반체. 블록 밖 내용 보존(형욱 메모 공존). inject_core_rules 폐기로 07-07의 core-rules 캡 경고도 함께 제거(더 이상 매 턴 주입/절단 없음) |
+| 2026-07-06 | `inject_plan_pointer.py` 신설 — plan.md 수용 기준을 매 턴 재주입 | 상시 규칙은 CLAUDE.md로 갔지만 *진행 중 계약*(plan.md)은 동적이라 CLAUDE.md가 못 나름 → planning-with-files 검증 패턴(디스크 plan + 매 턴 재주입, compaction 생존). 기준 섹션만 ~1500자 캡. core-rules 주입 제거와 합쳐 총 주입량 순감 |
+| 2026-07-06 | `guard_bash.py` 신설(파국 명령 **ask**) + `guard_paths`에 게이트 파일 ask | Windows엔 OS 샌드박스 없음 → hook이 유일한 바닥(빌드로그 §5 후보였음). rm -rf 홈/루트, force-push, reset --hard, 게이트 우회 채널(pre-commit 변조·evaluate-off 생성·recipe 리다이렉트). deny 아닌 ask=사람이 결정. recipe Edit도 ask(기준 변경=사람 승인, /wook-plan당 1회 마찰 수용 — 형욱 선택) |
+| 2026-07-06 | **Stop 훅 → 0개**(remind_evaluator는 원격 07-07판대로 PostToolUse로, 포인터 검사 2개는 게이트로 흡수) | 포인터 신선도는 커밋 시점 속성인데 매 Stop마다 실행(알림 피로 — #16과 같은 교훈). remind_evaluator는 원격이 이미 PostToolUse(커밋 직후 1회)로 옮김 → Stop에 남는 게 없어짐. selfcheck의 4-event 필수에서 Stop 제외(핵심 3 event만 요구) |
+| 2026-07-06 | phaser4_reminder(SessionStart)는 repo 미흡수 | 형욱: 한 프로젝트에만 해당 → 글로벌 훅 부적합. deploy 시 글로벌 등록 소실 수용, 해당 프로젝트 로컬로 재설치 예정 |
+| 2026-07-07 | **v2(#19) ↔ 원격 10커밋 reconcile** — v2 트렁크 + 원격 4개 접붙이기 | 원격 세션(점진 개선)과 v2(공격적 재배치)가 같은 부위를 병렬 개조 → 충돌. 형욱 결정: **v2를 트렁크로**, 원격의 검증된 개선을 접붙임 — ① `find_bash()` WSL 수정 → `gate_runner`, ② `remind_evaluator` 커밋직후+≥30줄판 채택(PostToolUse), ③ `/wook-audit`·`/wook-sandbox` 스킬 편입, ④ staged-scoped lint + `build` 게이트 금지 가이드(`/wook-plan`·예시). 원격의 gate_on_commit·Stop 포인터 검사는 v2가 상위 대체(삭제). `git merge` 충돌 8개 수동 해결 |
 
 ---
 
@@ -107,7 +115,10 @@
   (Write로 `x=1+2` 생성 → hook이 `x = 1 + 2` 등으로 교정). ✅ live
 - **안전:** ruff 없음/포맷 실패/잘못된 입력 → 전부 조용히 exit 0, 편집 절대 안 막음.
 
-### ✅ #2 UserPromptSubmit — 망각 방지(core-rules 재주입)
+### ⛔ #2 UserPromptSubmit — 망각 방지(core-rules 재주입) → **대체됨: v2 CLAUDE.md 운반체(2026-07-06)**
+> 매 턴 additionalContext 주입은 transcript에 누적되는 토큰세(~700토큰×턴)였고, 그 사이
+> CLAUDE.md의 1회 로드·캐시·compaction 후 재주입이 공식 문서화됨 → `deploy.py`가
+> `core-rules.md`를 `~/.claude/CLAUDE.md`의 marked block으로 렌더(§2-I #17). 이하는 히스토리.
 - **목적:** 매 프롬프트마다 핵심 지침을 `additionalContext`로 주입 → 대화 길어져도 안 흐려짐.
 - **파일:**
   - `~/.claude/harness/core-rules.md` — 주입할 **순수 규칙**(사실 진술체)
@@ -368,23 +379,60 @@ LLM 평가자(서브에이전트)만 가능(결정론 셸 게이트는 브라우
 
 ---
 
+## 2-I. 하네스 v2 — 검증된 운반체로 재배치 (2026-07-06)
+
+### ✅ #19 v2 재배치 — pre-commit 게이트 · CLAUDE.md 규칙 · plan 재주입 · bash 가드
+> (#17=`/wook-audit`, #18=`/wook-sandbox`는 원격 세션이 선점 → v2 재배치는 #19)
+- **배경:** 2026 중반 트렌드 감사(멀티에이전트 리서치 18개) → "철학은 컨센서스와 일치,
+  운반체를 네이티브로" + 구멍 2개(게이트 자기보호·위험 명령 가드). 형욱 승인 4건
+  (스펙 / recipe-ask ON / core-rules 주입 완전 삭제 / phaser4 미흡수).
+- **게이트(#16 → #19):** `claude/harness/gate_runner.py`를 `.git/hooks/pre-commit`이 실행
+  (`install_gate.py`가 설치, 멱등·타 훅 보호). 기능: recipe 실행(**`find_bash()`로 WSL bash
+  회피** — 원격 06-30 수정 이식, Windows에서 Git Bash만) + **자기보호**(staged에 recipe M/D/R
+  또는 테스트 삭제 → `GATE_EDIT_OK=1` 요구; recipe A(신규)는 통과 = 게이트 켜는 행위)
+  + **stall**(같은 정규화 실패 시그니처 3연속 → "반복 말고 사람에게"; 성공 시 상태 삭제)
+  + 포인터 신선도 경고(구 Stop 검사 2개 흡수, 비차단).
+- **주입 재편:** core-rules → `~/.claude/CLAUDE.md` marked block(`build_user_claude_md`,
+  블록 밖 보존·멱등) / 신규 `inject_plan_pointer.py`(plan.md 수용 기준 섹션만 ~1500자 캡).
+  UserPromptSubmit은 여전히 3개(plan·reuse·convention)지만 상시 ~700토큰 주입이 빠져 순감.
+- **리마인더(원격 07-07판 채택):** `remind_evaluator`는 Stop이 아니라 **PostToolUse(Bash)**에서
+  `git commit` 직후 1회, 코드 변경 ≥30줄일 때만 발동(작은 커밋=침묵). 포인터 검사가 게이트로
+  빠지면서 **Stop 훅은 0개** → selfcheck 4-event 필수에서 Stop 제외.
+- **가드:** `guard_bash.py`(파국 명령·게이트 우회 채널 → ask, 오탐 0 목록, "정책 레이어지
+  보안 경계 아님" 명시) / `guard_paths.py`에 recipe·evaluate-off **ask** 추가(deny 목록 불변).
+- **삭제:** gate_on_commit.py · inject_core_rules.py · check_reuse_pointers.py ·
+  check_convention_pointers.py (+ test_gate_on_commit.py → test_gate_runner.py로 대체).
+- **원격 접붙임(reconcile):** `find_bash()` WSL 수정 · remind_evaluator 커밋직후판 ·
+  `/wook-audit`·`/wook-sandbox` 스킬 · staged-scoped lint/`build`-금지 가이드(`/wook-plan`·예시).
+- **검증:** `tools/run_tests.py`(신규 러너) 파일 PASS — test_gate_runner 14케이스
+  (A–N: 통과/실패/무레시피/off/비-git/자기보호 4종/stall 2종/포인터 경고 2종),
+  test_guard_bash 29케이스(위험 18→ask·안전 11→통과), test_inject_plan_pointer 6,
+  test_conventions 6(게이트 러너로 이식), test_codex_adapter(+CLAUDE.md 빌더 4·ask 3).
+  selfcheck에 harness/*.py 컴파일·settings→스크립트 존재 대조·pre-commit 미설치 경고 추가.
+- **정직한 한계:** guard_bash는 문자열 매칭 = 우발 사고 방지용이지 보안 경계 아님(인터프리터
+  우회 가능 — 연구로 문서화됨). 원격(클라우드) 세션엔 pre-commit 미설치 → 게이트 안 돎
+  (구 gate_on_commit도 ~/.claude 없는 원격에선 동일했음 — 회귀 아님).
+
+---
+
 ## 3. 파일 인벤토리 (`~/.claude`)
 
 ```
 ~/.claude/
-├─ settings.json                     # hooks 등록(PreToolUse, PostToolUse, UserPromptSubmit, Stop)
-├─ hooks/
-│  ├─ guard_paths.py                  # #3 보호 경로 가드(deny)
+├─ settings.json                     # hooks 등록(PreToolUse, PostToolUse, UserPromptSubmit) — Stop 없음
+├─ CLAUDE.md                          # #19 상시 규칙(marked block, deploy가 core-rules에서 렌더)
+├─ hooks/                             # 7개 (v2: gate_on_commit·inject_core_rules·check_* 2개 폐기)
+│  ├─ guard_paths.py                  # #3 보호 경로 deny + 게이트 파일 ask(#19)
+│  ├─ guard_bash.py                   # #19 파국 명령 ask(rm -rf 홈/루트·force-push·게이트 우회)
 │  ├─ format_py.py                    # #1 자동 포맷
-│  ├─ inject_core_rules.py            # #2 망각 방지 주입
+│  ├─ inject_plan_pointer.py          # #19 진행 중 plan 수용 기준 재주입
 │  ├─ inject_reuse_pointer.py         # #9 재사용 카탈로그 포인터
 │  ├─ inject_convention_pointer.py    # #11 컨벤션 포인터
-│  ├─ gate_on_commit.py               # #16 커밋 게이트(PreToolUse, git commit 가로채기)
-│  ├─ check_reuse_pointers.py         # #9 스테일 포인터 알림(Stop hook, 비차단)
-│  ├─ check_convention_pointers.py    # #11 컨벤션 스테일 알림(Stop hook, 비차단)
-│  └─ remind_evaluator.py             # #12 독립 평가자 리마인더(Stop hook, 비차단)
+│  └─ remind_evaluator.py             # #12→07-07 독립 평가자 리마인더(PostToolUse Bash, 커밋직후 1회 ≥30줄)
 ├─ harness/
-│  ├─ core-rules.md                   # 주입되는 규칙(편집 대상)
+│  ├─ gate_runner.py                  # #19 커밋 게이트 본체(.git/hooks/pre-commit이 실행)
+│  ├─ install_gate.py                 # #19 pre-commit 쉼 설치(멱등, 남의 훅 안 덮음)
+│  ├─ core-rules.md                   # 상시 규칙 소스(CLAUDE.md·AGENTS.md로 렌더됨)
 │  ├─ core-rules.README.md            # 규칙 작성 가이드
 │  ├─ evaluate.recipe.example         # 검증 레시피 템플릿(프로젝트로 복사)
 │  ├─ conventions.frontend.example    # #11 frontend 컨벤션 템플릿
@@ -393,7 +441,7 @@ LLM 평가자(서브에이전트)만 가능(결정론 셸 게이트는 브라우
 │  └─ wook-evaluator.md               # #5 독립 Evaluator 서브에이전트
 └─ skills/
    ├─ wook-evaluate/SKILL.md          # /wook-evaluate 진입점
-   ├─ wook-plan/SKILL.md              # #8 /wook-plan (Planner)
+   ├─ wook-plan/SKILL.md              # #8 /wook-plan (Planner; recipe 작성+게이트 설치)
    ├─ wook-brainstorm/SKILL.md        # #10 /wook-brainstorm (발산, PGE 앞단)
    ├─ wook-index/SKILL.md             # #9 /wook-index (재사용 카탈로그 생성)
    ├─ wook-conventions/SKILL.md       # #11 /wook-conventions (컨벤션 생성, bimodal)
@@ -409,6 +457,8 @@ LLM 평가자(서브에이전트)만 가능(결정론 셸 게이트는 브라우
       ├─ scripts/gen_palette.py       #   결정론 생성기: HTML + WCAG 대비 계산 + tokens.css 추출
       └─ references/token-roles.md    #   토큰 역할 계약(base/surface/accent…) + AA 기준
 ```
+프로젝트 쪽: recipe 있는 repo의 `.git/hooks/pre-commit`(install_gate가 설치) → gate_runner 실행.
+stall 카운터는 `<git-dir>/wook-gate-state.json`(로컬, 커밋 안 됨).
 
 ---
 
@@ -424,13 +474,13 @@ my-claude-harness/                  # git repo (비밀 0, 단순 blacklist .giti
 ├─ CLAUDE.md                        # 이 repo 작업 시 컨벤션(build-log 갱신 등)
 ├─ docs/{claude-harness-design, build-log}.md
 ├─ claude/                          # ~/.claude 산출물의 source of truth
-│  ├─ hooks/{guard_paths, format_py, inject_core_rules, inject_reuse_pointer, inject_convention_pointer, gate_on_commit, check_reuse_pointers, check_convention_pointers, remind_evaluator}.py
-│  ├─ harness/{core-rules.md, core-rules.README.md, evaluate.recipe.example, conventions.frontend.example, project-map.example}
+│  ├─ hooks/{guard_paths, guard_bash, format_py, inject_plan_pointer, inject_reuse_pointer, inject_convention_pointer, remind_evaluator}.py
+│  ├─ harness/{gate_runner.py, install_gate.py, core-rules.md, core-rules.README.md, evaluate.recipe.example, conventions.frontend.example, project-map.example}
 │  ├─ agents/wook-evaluator.md       # #5 Evaluator 서브에이전트
 │  ├─ skills/{wook-evaluate, wook-plan, wook-brainstorm, wook-index, wook-conventions, wook-map, wook-onboard}/SKILL.md  # 진입점
 │  └─ settings.hooks.json           # 우리가 소유한 hooks 블록({HOOKS_DIR} placeholder)
 ├─ deploy.py                        # claude/ -> ~/.claude 배포 (--check drift시 exit 1)
-├─ tools/{selfcheck.py, test_gate_on_commit.py, test_conventions.py, test_evaluator.py, test_project_map.py, test_codex_adapter.py}  # 자기검증 + #16·#11~#13·#15 테스트
+├─ tools/{selfcheck.py, run_tests.py, test_gate_runner.py, test_guard_bash.py, test_inject_plan_pointer.py, test_conventions.py, test_evaluator.py, test_project_map.py, test_codex_adapter.py}  # 자기검증 러너 + #17·#11~#13·#15 테스트
 ├─ deploy.py                        # claude/ → ~/.claude|~/.codex 멱등 배포 (--target)
 ├─ .claude/{evaluate.recipe, plan.md}  # 이 repo 자신의 게이트 설정(자기검증 ON)
 └─ .gitignore
@@ -456,8 +506,12 @@ my-claude-harness/                  # git repo (비밀 0, 단순 blacklist .giti
 - [x] git repo 구조 확립(별도 클린 repo + `deploy.py` 배포) + 로컬 첫 커밋
 - [x] public 원격 연결 + push → https://github.com/sleepy-wook/my-claude-harness
 - [x] #3 PreToolUse 보호 경로 가드(deny) — 구체적 패턴만 차단(오탐 0)
-- [ ] (#3 확장 후보) 위험 bash 명령 가드(`rm -rf`, `git push --force` 등) — 의논
-- [ ] (#3 의미형) "안 시킨 행동" 판단 차단 — 판단 레이어(PGE)에서, 결정론 deny ✗
+- [x] (#3 확장) 위험 bash 명령 가드(`rm -rf`, `git push --force` 등) — #17 `guard_bash.py`(ask)
+- [ ] (#3 의미형) "안 시킨 행동" 판단 차단 — 판단 레이어(PGE)에서, 결정론 deny ✗.
+      부분 대응: v2 감사가 제안한 **스코프 glob 게이트**(plan에 허용 파일 목록 → 게이트가
+      staged 대조)가 Phase 2 후보
+- [ ] (Phase 2 후보, 감사 2026-07-06) 웹/Phaser **스모크 프로브**(`probe.mjs` 템플릿 →
+      recipe `smoke:` 한 줄, 게임이 뜨고 콘솔 깨끗한지 결정론 검증)
 
 > **step A(결정론 바닥) 사실상 완료.** 다음은 B(판단 루프/PGE) — 형욱과 의논하며.
 

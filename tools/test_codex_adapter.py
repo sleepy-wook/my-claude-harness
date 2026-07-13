@@ -31,8 +31,8 @@ print("Test — Codex hooks.json transform")
 cj = deploy.build_codex_hooks_json(settings_text, HD)
 events = set(cj.get("hooks", {}))
 check(
-    "valid + has 4 events",
-    {"PreToolUse", "PostToolUse", "UserPromptSubmit", "Stop"} <= events,
+    "valid + has the core events",
+    {"PreToolUse", "PostToolUse", "UserPromptSubmit"} <= events,
 )
 json.dumps(cj)  # must be serialisable
 check(
@@ -127,7 +127,24 @@ try:
 except ImportError:
     check("tomllib unavailable — string check", 'sandbox_mode = "read-only"' in ev)
 
-print("Test — hook field tolerance (file_path ↔ path)")
+print("Test — ~/.claude/CLAUDE.md builder (v2 standing-rules carrier)")
+core = (REPO / "claude" / "harness" / "core-rules.md").read_text(encoding="utf-8")
+fresh = deploy.build_user_claude_md(core, None)
+check(
+    "fresh render has markers + a known rule",
+    deploy.CLAUDE_MD_BEGIN in fresh and "테스트·검증" in fresh,
+)
+check("source H1 dropped", "# core-rules\n" not in fresh)
+check("idempotent re-render", deploy.build_user_claude_md(core, fresh) == fresh)
+merged = deploy.build_user_claude_md(
+    core, "# my own notes\n\n" + fresh + "\nmore below\n"
+)
+check(
+    "text outside the block preserved",
+    merged.startswith("# my own notes") and merged.rstrip().endswith("more below"),
+)
+
+print("Test — hook field tolerance (file_path ↔ path) + gate-file ask")
 GP = str(REPO / "claude" / "hooks" / "guard_paths.py")
 
 
@@ -141,9 +158,32 @@ def run_guard(tool_input):
     return p.stdout
 
 
-check("denies via Codex `path`", "deny" in run_guard({"path": "secret.pem"}))
-check("denies via Claude `file_path`", "deny" in run_guard({"file_path": "secret.pem"}))
+def decision(out):
+    return (
+        json.loads(out)["hookSpecificOutput"]["permissionDecision"]
+        if out.strip()
+        else ""
+    )
+
+
+check("denies via Codex `path`", decision(run_guard({"path": "secret.pem"})) == "deny")
+check(
+    "denies via Claude `file_path`",
+    decision(run_guard({"file_path": "secret.pem"})) == "deny",
+)
 check("allows a normal file", run_guard({"path": "app.py"}).strip() == "")
+check(
+    "asks on evaluate.recipe (self-protection)",
+    decision(run_guard({"file_path": ".claude/evaluate.recipe"})) == "ask",
+)
+check(
+    "asks on evaluate-off",
+    decision(run_guard({"file_path": ".claude/evaluate-off"})) == "ask",
+)
+check(
+    "asks on Codex-side .codex recipe too",
+    decision(run_guard({"path": ".codex/evaluate.recipe"})) == "ask",
+)
 
 print(f"\nRESULT: {sum(results)}/{len(results)} passed")
 sys.exit(0 if all(results) else 1)

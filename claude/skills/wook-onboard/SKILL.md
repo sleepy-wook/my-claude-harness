@@ -36,10 +36,13 @@ different files is independent, so this is safe — keep the *writing* in your h
 
 ## Step 3 — propose, then write on approval
 - **Show a summary BEFORE writing**: the file list to be created/refreshed, the proposed
-  `evaluate.recipe` (and that **its presence turns the auto-gate ON**), the domains covered, and
-  any inconsistencies the developer must decide. Get approval/edits.
-- **On approval, write** all the artifacts. Verify every `path:symbol` pointer resolves. Report
-  what was created vs refreshed vs skipped, and remind that the gate is now on.
+  `evaluate.recipe` (and that the **commit gate will run it on every `git commit`**), the
+  domains covered, and any inconsistencies the developer must decide. Get approval/edits.
+- **On approval, write** all the artifacts, then **install the gate**:
+  `python ~/.claude/harness/install_gate.py` (writes `.git/hooks/pre-commit`; idempotent,
+  never overwrites a foreign hook). Verify every `path:symbol` pointer resolves. Report
+  what was created vs refreshed vs skipped, and remind that the gate is now armed
+  (`.claude/evaluate-off` disables; `git commit --no-verify` bypasses).
 
 ## Rules
 - Approval-gated: this creates a lot at once (and the recipe turns the gate on) — never mass-write
