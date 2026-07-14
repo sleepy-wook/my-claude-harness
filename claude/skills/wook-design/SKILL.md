@@ -33,9 +33,13 @@ Hard numbers live in `references/shared/design-foundations.md`; don't restate th
 memory, read them.
 
 ## Step 3 — one aesthetic, written as a spec
-Define the project's single visual mood using `references/shared/aesthetic-method.md`:
-declarative buildable sentences, a Tuning-knobs section, and an **Avoid** list that
-defines the aesthetic negatively. Include the fixed negative prompts. Record the result
+**Start from the preset library** `references/presets/INDEX.md` — 12 distinct, AA-verified
+vibes (warm-linen, emerald-console, laser-dither, arcade-fuchsia, editorial-grid, …). If the
+developer's mood matches one, take its build/motion/avoid block and its palette (in
+`library.json`, ready for `/wook-palette`) as the starting point, then tune. If none fits,
+author a fresh aesthetic with `references/shared/aesthetic-method.md`.
+Either way the aesthetic is: declarative buildable sentences, a Tuning-knobs section, and an
+**Avoid** list that defines it negatively, plus the fixed negative prompts. Record the result
 in the project's conventions doc — that becomes the source of truth, not this skill.
 
 ## Step 4 — iterate as variants, not rerolls
