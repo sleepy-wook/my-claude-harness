@@ -101,6 +101,7 @@
 | 2026-07-07 | **v2(#19) ↔ 원격 10커밋 reconcile** — v2 트렁크 + 원격 4개 접붙이기 | 원격 세션(점진 개선)과 v2(공격적 재배치)가 같은 부위를 병렬 개조 → 충돌. 형욱 결정: **v2를 트렁크로**, 원격의 검증된 개선을 접붙임 — ① `find_bash()` WSL 수정 → `gate_runner`, ② `remind_evaluator` 커밋직후+≥30줄판 채택(PostToolUse), ③ `/wook-audit`·`/wook-sandbox` 스킬 편입, ④ staged-scoped lint + `build` 게이트 금지 가이드(`/wook-plan`·예시). 원격의 gate_on_commit·Stop 포인터 검사는 v2가 상위 대체(삭제). `git merge` 충돌 8개 수동 해결 |
 | 2026-07-08 | #20 `/wook-design` — 디자인 스킬 팩(**웹/앱 bimodal** + references/ 계층) *(원격 세션은 #19로 기록 → v2 재배치가 #19 선점이라 #20으로 재번호)* | 형욱 리서치 문서 기반: 생태계 빈자리 = 데스크톱 랜딩(MengTo)·네이티브 앱·게임 아키텍처 사이의 "웹 기술 모바일 비율 인터랙티브 UI". 4개 repo 병렬 발췌(bergside 골격·Quality Gates / ceorkm 5단계·60/30/10·8pt·44px / openai game-studio DOM 오버레이 HUD·thin scenes·안티패턴(버전중립, v4 안전) / MengTo specs-beat-vibes·variants>rerolls·미감 서술 문체). 결정: 스킬 2개 대신 **1개+웹/앱 모드**(MengTo 프리셋 트리거 충돌 교훈), SKILL.md 얇게+references/{shared,web,app} 6파일(ceorkm 149줄 뚱뚱 반면교사), **토큰은 conventions가 소유**(스킬은 소비 — sandbox와 동일 원칙), 검증은 sandbox+evaluator로 연결. deploy가 중첩 references/ 배포함 확인. selfcheck 11 md·deploy --check 0 · (v2 위에 재배치) |
 | 2026-07-08 | #21 `/wook-palette` — 대화형 팔레트 생성 + **고정-UI 팔레트 HTML**(WCAG 계산 내장) *(원격 #20 → #21 재번호, 위와 동일 사유)* | 형욱 요청 + #20 평가에서 짚은 🔴 그린필드 토큰 공백/🟡 검증 turnkey를 정확히 메움(ratchet 통과). 티키타카로 무드 수집 → variant 후보 N개 → **결정론 스크립트 `gen_palette.py`**(bash 실행=컨텍스트 미소비, Agent Skills 원칙)가 고정-UI HTML 생성: 후보별 스와치+라이브 프리뷰+**WCAG 대비 PASS/FAIL 계산**(눈이 아니라 수치). 확정 시 `--css N`로 tokens.css turnkey 추출 + conventions가 그걸 가리킴(값은 토큰, 문서는 규칙). 별도 스킬(생성=대화형 vs 기록=문서, conventions와 직교). 닷푸드: 후보 4개 생성, evaluator가 실브라우저 렌더+대비 독립 재계산(소수점 일치), 일부러 위험하게 만든 neon-void의 textMuted/surface 2.77:1·accentInk/accent 4.18:1을 **FAIL 정확 표시** 확인. selfcheck 12 md·deploy --check 0 · (v2 위에 재배치 — 순수 추가 스킬이라 아키텍처 무관) |
+| 2026-07-08 | #22 `/wook-design` 프리셋 라이브러리 12종 — **하베스트+AA검증**(MengTo만큼 넓이, 걔들 없는 품질게이트) *(원격 #21 → #22 재번호 — #21은 palette가 선점)* | 형욱 "우리 걸 MengTo만큼": 근데 MengTo 프리셋 25개는 **별도 스킬이라 트리거 충돌**(리서치가 잡음)·**대비 미검증**. 우리는 `wook-design/references/presets/`에 **단일 입구 라이브러리**(충돌 0)로: `library.json`(gen_palette 렌더+AA데이터) + `INDEX.md`(미감 서술 메뉴 12종). 취향은 창작 대신 **MengTo web-design에서 하베스트**(general-purpose agent) → 스택-중립 각색 + 출처표기(warm-linen·emerald-console·laser-dither·arcade-fuchsia·editorial-grid·frosted-glass 등, 라이트6/다크6). **킬러: 전 프리셋 AA 강제** — `tools/test_presets.py`(gen_palette 대비 계산 재사용, 렌더되는 6행 전부 검사, run_tests 통합 8/8). 닷푸드: 독립 evaluator 실브라우저 12카드 렌더·구별성 확인, gooey danger/surface 4.4:1 FAIL 1건 적발→#C93B31(5.06)로 수정+테스트가 그 행 게이트. wook-design/palette가 라이브러리를 시드로 사용하게 연결 |
 
 ---
 
@@ -451,7 +452,7 @@ LLM 평가자(서브에이전트)만 가능(결정론 셸 게이트는 브라우
    ├─ wook-sandbox/SKILL.md           # #18 /wook-sandbox (격리 제작→써보고→졸업)
    ├─ wook-design/                    # #20 /wook-design (웹/앱 bimodal 디자인 팩)
    │  ├─ SKILL.md                     #   얇은 입구: 모드 판별+프로세스+Quality Gates
-   │  └─ references/{shared,web,app}/ #   수치 룰·미감 서술법·웹 레이아웃·앱 비율·게임 UI
+   │  └─ references/{shared,web,app,presets}/ # 수치 룰·미감 서술법·레이아웃 + #22 프리셋 12종(INDEX.md·library.json, 전부 AA검증)
    └─ wook-palette/                   # #21 /wook-palette (대화형 팔레트 생성기)
       ├─ SKILL.md                     #   티키타카 → 후보 N개 → 고정-UI HTML → tokens+conventions
       ├─ scripts/gen_palette.py       #   결정론 생성기: HTML + WCAG 대비 계산 + tokens.css 추출
@@ -480,7 +481,7 @@ my-claude-harness/                  # git repo (비밀 0, 단순 blacklist .giti
 │  ├─ skills/{wook-evaluate, wook-plan, wook-brainstorm, wook-index, wook-conventions, wook-map, wook-onboard}/SKILL.md  # 진입점
 │  └─ settings.hooks.json           # 우리가 소유한 hooks 블록({HOOKS_DIR} placeholder)
 ├─ deploy.py                        # claude/ -> ~/.claude 배포 (--check drift시 exit 1)
-├─ tools/{selfcheck.py, run_tests.py, test_gate_runner.py, test_guard_bash.py, test_inject_plan_pointer.py, test_conventions.py, test_evaluator.py, test_project_map.py, test_codex_adapter.py}  # 자기검증 러너 + #17·#11~#13·#15 테스트
+├─ tools/{selfcheck.py, run_tests.py, test_gate_runner.py, test_guard_bash.py, test_inject_plan_pointer.py, test_conventions.py, test_evaluator.py, test_project_map.py, test_codex_adapter.py, test_presets.py}  # 자기검증 러너 + #17·#11~#13·#15·#22 테스트
 ├─ deploy.py                        # claude/ → ~/.claude|~/.codex 멱등 배포 (--target)
 ├─ .claude/{evaluate.recipe, plan.md}  # 이 repo 자신의 게이트 설정(자기검증 ON)
 └─ .gitignore

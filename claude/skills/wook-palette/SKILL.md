@@ -15,8 +15,11 @@ industry/context, any brand color or reference screenshots, what to AVOID. Stop 
 if unclear; don't invent a brand.
 
 ## Step 2 — generate N candidates (variants, not rerolls)
-Compose a `palettes.json` with a **variable number** of candidates (default ~4). Each candidate
-defines the full role set for `dark` and/or `light`:
+**Seed from the preset library** when a candidate's mood matches one of the 12 AA-verified vibes
+in `wook-design/references/presets/library.json` (copy its palette in as a starting candidate,
+then vary) — don't reinvent a known-good palette from scratch. Compose a `palettes.json` with a
+**variable number** of candidates (default ~4). Each candidate defines the full role set for
+`dark` and/or `light`:
 `base, surface, surface2, border, text, textMuted, accent, accentInk, danger, success`
 (see `references/token-roles.md`). Make candidates genuinely DIFFERENT (vary the mood axis),
 not near-duplicates — the point is a real choice.
