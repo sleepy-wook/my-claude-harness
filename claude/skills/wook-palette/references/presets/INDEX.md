@@ -6,7 +6,7 @@
 > MengTo/Skills web-design presets (`source` per entry) — they are a starting point to tune, not law.
 >
 > Flow: user names a mood → match a preset here → read its block → seed `library.json`'s palette into
-> `/wook-palette` (tweak & re-verify) → apply the build/motion/avoid rules via `/wook-design`.
+> `/wook-palette` (tweak & re-verify) → apply build/layout rules via the ui-ux-pro-max skill.
 
 | slug | mode | when to reach for it |
 |------|------|----------------------|

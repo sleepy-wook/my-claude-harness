@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Quality gate for the wook-design aesthetic preset library.
+"""Quality gate for the wook-palette aesthetic preset library.
 
 Every shipped preset palette MUST pass WCAG AA on the load-bearing pairs — this is the
-differentiator over hand-eyeballed preset libraries. Reuses the deterministic contrast
-math in gen_palette.py. Run from the repo root. Exit 0 = all presets AA-clean.
+differentiator over hand-eyeballed preset libraries (incl. ui-ux-pro-max's 161: breadth
+there, computed enforcement here). Reuses the deterministic contrast math in
+gen_palette.py. Run from the repo root. Exit 0 = all presets AA-clean.
 """
 
 import importlib.util
@@ -16,7 +17,7 @@ LIB = (
     REPO
     / "claude"
     / "skills"
-    / "wook-design"
+    / "wook-palette"
     / "references"
     / "presets"
     / "library.json"

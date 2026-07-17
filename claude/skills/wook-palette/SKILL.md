@@ -1,13 +1,16 @@
 ---
 name: wook-palette
-description: Use to create a project's color theme/palette interactively — ask the developer about mood, then generate several candidate palettes, render them as a fixed-UI HTML with live previews and computed WCAG contrast, let them pick, and write the chosen palette to the project's tokens + conventions. Triggers: "make a palette", "pick a color theme", "generate theme options", "design the color system", "I need brand colors". Not for laying out a screen (use wook-design) or one-off color tweaks.
+description: Use to create a project's color theme/palette interactively — ask the developer about mood, then generate several candidate palettes, render them as a fixed-UI HTML with live previews and computed WCAG contrast, let them pick, and write the chosen palette to the project's tokens + conventions. Triggers: "make a palette", "pick a color theme", "generate theme options", "design the color system", "I need brand colors". Not for laying out a screen (that's ui-ux-pro-max's job) or one-off color tweaks.
 ---
 
 # /wook-palette — build a color theme, together, ending in a visual you pick from
 
-Fills the greenfield gap ahead of `/wook-design`: it produces the actual **tokens** a
-project designs against. Interactive (tiki-taka), variant-based, and it ends in a **fixed-UI
-palette HTML** so you choose by seeing, not by reading hex.
+The token gate of the design flow: **ui-ux-pro-max (main design brain) recommends → this
+skill verifies and mints the tokens** a project designs against. Interactive (tiki-taka),
+variant-based, and it ends in a **fixed-UI palette HTML** so you choose by seeing, not by
+reading hex. Whatever a recommendation's source — ui-ux-pro-max's palette database (breadth,
+but contrast NOT verified there), the local preset library, or a fresh idea — it only becomes
+`tokens.css` after the computed WCAG check here passes.
 
 ## Step 1 — tiki-taka: gather intent (don't dump a form)
 Ask a FEW pointed questions, one exchange at a time — mood/feeling, light vs dark (or both),
@@ -15,9 +18,13 @@ industry/context, any brand color or reference screenshots, what to AVOID. Stop 
 if unclear; don't invent a brand.
 
 ## Step 2 — generate N candidates (variants, not rerolls)
-**Seed from the preset library** when a candidate's mood matches one of the 12 AA-verified vibes
-in `wook-design/references/presets/library.json` (copy its palette in as a starting candidate,
-then vary) — don't reinvent a known-good palette from scratch. Compose a `palettes.json` with a
+Two seed sources — don't reinvent a known-good palette from scratch:
+- **ui-ux-pro-max's palette search** (installed skill; e.g. its `search.py "<industry>"
+  --design-system`) for breadth — treat its hex values as *candidates*, never as done
+  (its palettes are not contrast-verified).
+- **The local preset library** (`references/presets/library.json`, 12 AA-verified vibes) —
+  copy a matching palette in as a starting candidate, then vary.
+Compose a `palettes.json` with a
 **variable number** of candidates (default ~4). Each candidate defines the full role set for
 `dark` and/or `light`:
 `base, surface, surface2, border, text, textMuted, accent, accentInk, danger, success`

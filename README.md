@@ -73,9 +73,15 @@ python deploy.py --target=codex     # ~/.codex 로: hooks.json·skills/·AGENTS.
 | [`/wook-index`](#wook-index) | 재사용 카탈로그 | 지식 |
 | `/wook-audit` | 전체 트리 상시 감사 원장(`.claude/audit/`) | 지식 |
 | `/wook-sandbox` | 격리 제작 → 써보고 → 졸업(실제 경로로 이동) | 제작 |
+| `/wook-palette` | 디자인 흐름의 **토큰 관문** — 추천이 어디서 오든 WCAG AA 계산 통과 후 tokens.css | 디자인 |
 
 > 트리거는 직접 타이핑(`/wook-plan`)하거나, 설명에 맞는 상황이면 Claude가 알아서 제안한다.
-> (`/wook-audit`·`/wook-sandbox`는 상세 절 없이 스킬 본문이 안내 — SKILL.md 참조.)
+> (`/wook-audit`·`/wook-sandbox`·`/wook-palette`는 상세 절 없이 스킬 본문이 안내 — SKILL.md 참조.)
+
+**디자인 흐름 (2026-07-17~):** 발상·스타일·레이아웃은 서드파티 **ui-ux-pro-max**(107k★,
+`npm i -g ui-ux-pro-max-cli && uipro init --ai claude --global`로 설치·업데이트, repo 밖)가
+메인이고, 하네스는 검증 레이어를 댄다: pro-max 추천 → `/wook-palette`(AA 계산 → tokens →
+conventions) → `/wook-sandbox`(격리 제작) → evaluator+커밋 게이트. (구 `/wook-design`은 폐기.)
 
 ---
 

@@ -1,6 +1,6 @@
 # Token roles — the contract every palette candidate must define
 
-> The generator (`scripts/gen_palette.py`) and `/wook-design` both assume these role names.
+> The generator (`scripts/gen_palette.py`) and the preset library assume these role names.
 > Values live in the emitted `tokens.css` as CSS custom properties; docs point at them.
 
 | role | CSS var | what it is | contrast partner |
