@@ -139,6 +139,17 @@ def audit(roles: dict) -> dict:
         r = contrast(a, b)
         if not aa(r, large):
             (out["fails"] if enforced else out["warns"]).append((f"{fg}/{bg}", r, a, b))
+
+    # A tier that equals the tier above it passes every contrast check and still ruins the
+    # design: muted captions rendered in body-text colour. Contrast can't see this, so we
+    # look for it explicitly (a real page shipped this way on 2026-07-17).
+    #    Only muted_foreground: `card_foreground == foreground` is normal and correct
+    #    (card body text IS body text), so flagging it would just be noise.
+    x, y = roles.get("muted_foreground"), roles.get("foreground")
+    if is_hex(x) and is_hex(y) and x.upper() == y.upper():
+        out["warns"].append(
+            ("muted_foreground == foreground (tier collapsed)", contrast(x, y), x, y)
+        )
     return out
 
 
@@ -161,11 +172,20 @@ def repair(roles: dict) -> tuple:
     The brand colour (accent/primary/destructive background) is never touched — that is
     the designer's choice; only the ink on top of it is ours to adjust.
 
-    Ink is chosen in the palette's own vocabulary first: try the existing anchors
-    (background / foreground / card) before inventing a new value. That is what a designer
-    actually does — and it reproduces pro-max's own answer (its on_accent for the OLED row
-    IS the background, #0F172A). Blind channel-shifting is the last resort because it
-    lands on muddy greys (#FFFFFF -> #3F3F3F) that belong to no palette.
+    Two rules learned the hard way (2026-07-17, an evaluator caught both in a real page):
+
+    1. **Never collapse a text tier.** `muted_foreground` exists to be *quieter* than
+       `foreground`. Reusing `foreground` as its ink scores a lovely 8.4:1 and destroys the
+       thing the role is for — the page rendered body text and muted captions in one colour.
+       Goodhart: the metric passed, the design died. So tier inks are NUDGED (keeping their
+       hue), never swapped for another tier's colour.
+    2. **Pass the bar, don't max it.** Picking `max(contrast)` always lands on the most
+       extreme colour available. We want the *smallest* change that clears AA, so the
+       designer's intent survives.
+
+    Anchors (background/card) still come first for `on_*` inks — text sitting on a brand
+    surface has no hue of its own to protect, and this reproduces pro-max's own answer
+    (its on_accent for the OLED row IS the background, #0F172A).
     """
     roles = dict(roles)
     changed = []
@@ -177,18 +197,18 @@ def repair(roles: dict) -> tuple:
             continue
         orig, best = a, None
 
-        # 1. reuse an anchor already in this palette (highest contrast wins)
-        anchors = [
-            roles.get(k) for k in ("background", "foreground", "card", "primary")
-        ]
-        ok = [c for c in anchors if is_hex(c) and aa(contrast(c, b), large)]
-        if ok:
-            best = max(ok, key=lambda c: contrast(c, b))
+        # 1. `on_*` ink only: reuse a surface anchor. Other *_foreground roles are tiers —
+        #    borrowing another tier's colour would merge them (see rule 1 above).
+        if fg.startswith("on_"):
+            anchors = [roles.get(k) for k in ("background", "card")]
+            ok = [c for c in anchors if is_hex(c) and aa(contrast(c, b), large)]
+            if ok:
+                best = min(ok, key=lambda c: contrast(c, b))  # just clear the bar
 
-        # 2. otherwise nudge the original ink until it passes
+        # 2. nudge the original ink, keeping its hue, until it just passes
         if best is None:
             toward_white = luminance(b) < 0.18
-            for step in range(8, 256, 8):
+            for step in range(4, 256, 4):
                 cand = _shift(a, toward_white, step)
                 if aa(contrast(cand, b), large):
                     best = cand

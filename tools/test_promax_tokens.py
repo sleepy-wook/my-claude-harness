@@ -129,6 +129,50 @@ check(
 )
 check("H repaired tokens now pass --check", not g.audit(fixed)["fails"], "")
 
+print("Test T-W — repair must not win the metric by killing the design (2026-07-17)")
+# An evaluator caught --fix scoring muted_foreground 8.4:1 by making it IDENTICAL to
+# foreground: body text and muted captions in one colour. Goodhart in one line.
+TIER = {
+    **CLEAN,
+    "background": "#FDF2F8",
+    "foreground": "#831843",
+    "card": "#FFFFFF",
+    "card_foreground": "#831843",
+    "muted": "#F1EEF5",
+    "muted_foreground": "#64748B",  # 4.14:1 — just under
+    "primary": "#EC4899",
+    "on_primary": "#FFFFFF",
+    "accent": "#0891B2",
+    "on_accent": "#FFFFFF",
+}
+fixed_t, _ = g.repair(TIER)
+check(
+    "T muted_foreground repaired to AA",
+    g.aa(g.contrast(fixed_t["muted_foreground"], fixed_t["muted"])),
+    f"{fixed_t['muted_foreground']} = {g.contrast(fixed_t['muted_foreground'], fixed_t['muted'])}:1",
+)
+check(
+    "U ...WITHOUT collapsing into foreground (the tier must survive)",
+    fixed_t["muted_foreground"].upper() != fixed_t["foreground"].upper(),
+    f"muted={fixed_t['muted_foreground']} vs fg={fixed_t['foreground']}",
+)
+check(
+    "V ...and it just clears the bar, not maxes it (designer intent survives)",
+    g.contrast(fixed_t["muted_foreground"], fixed_t["muted"]) < 6.0,
+    f"{g.contrast(fixed_t['muted_foreground'], fixed_t['muted'])}:1",
+)
+collapsed = {**TIER, "muted_foreground": TIER["foreground"]}
+check(
+    "W audit warns when a tier IS collapsed (contrast alone cannot see it)",
+    any("tier collapsed" in n for n, *_ in g.audit(collapsed)["warns"]),
+    "",
+)
+check(
+    "X ...but card_foreground == foreground is normal, never warned",
+    not any("card_foreground" in n for n, *_ in g.audit(TIER)["warns"]),
+    "",
+)
+
 print("Test I — fix via CLI round-trips to exit 0")
 d = tempfile.mkdtemp(prefix="promaxtok_")
 out_css = Path(d) / "fixed.css"
