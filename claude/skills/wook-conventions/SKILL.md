@@ -25,6 +25,13 @@ file, a config), referenced by a `path:symbol` pointer so detail never goes stal
 ## What each domain typically covers (a prompt, not a schema — infer the real categories)
 
 - **frontend**: theme (light/dark), color tokens (primary/secondary/danger + hover/active/disabled), spacing scale, typography, component naming.
+  - **Token issuance is single-source: `/wook-palette` only.** Its `gen_palette.py` *computes*
+    WCAG AA and only then emits `tokens.css`; the doc points at that file. Many installed
+    third-party design skills (design-system, brand, ui-styling, slides…) also offer to write
+    tokens/`tailwind.config`/CSS vars — none of them compute contrast (their WCAG lives in prose
+    docs), so a `tokens.css` produced by any other path is NOT accepted: re-issue it through
+    `/wook-palette`. Recommendations from anywhere (ui-ux-pro-max's palette DB included) are
+    *candidates* until that computed check passes.
 - **backend**: API response shape, error/HTTP policy, layering (controller/service/repo), naming, validation, logging, pagination.
 - **db**: table/column naming, PK/FK conventions, timestamps, soft-delete, migration rules, indexes, enums.
 - **infra**: resource naming, tagging, module structure, secrets handling, environment promotion.
@@ -73,4 +80,7 @@ Use this to know what to ASK (greenfield) or EXTRACT (brownfield) for the domain
 - Keep it compact; values live in the pointed-at source, not duplicated here.
 - Only stable, reusable conventions — not one-off choices.
 - Enforce only rules that have a real checker; leave the rest as guidance (don't fake a gate).
+- **Color/token authority is `/wook-palette`** — computed AA, then `tokens.css`, then a pointer
+  from here. A third-party skill that auto-triggers and emits raw hex or its own token file
+  bypasses the only computed gate we have; route it back through `/wook-palette` instead.
 - Re-run after conventions change so the doc stays current (or update it inline per core-rules).
