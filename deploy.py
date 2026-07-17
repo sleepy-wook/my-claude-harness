@@ -25,6 +25,12 @@ import shutil
 import sys
 from pathlib import Path
 
+try:  # gate-executed (`deploy --check` is a recipe line): our output must survive cp949
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
 REPO = Path(__file__).resolve().parent
 SRC = REPO / "claude"  # tool-neutral source (name kept for git history)
 

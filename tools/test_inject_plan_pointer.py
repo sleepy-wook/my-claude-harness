@@ -12,6 +12,13 @@ import sys
 import tempfile
 from pathlib import Path
 
+try:  # gate-executed script contract: our own output must survive a cp949 console
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
+
 HOOK = str(
     Path(__file__).resolve().parent.parent
     / "claude"
@@ -35,6 +42,7 @@ def run(d):
         capture_output=True,
         text=True,
         encoding="utf-8",
+        errors="replace",
         timeout=30,
     )
     return p.returncode, p.stdout.strip()

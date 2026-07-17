@@ -13,6 +13,13 @@ import sys
 import tempfile
 from pathlib import Path
 
+try:  # gate-executed script contract: our own output must survive a cp949 console
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
+
 HOOKS = Path(__file__).resolve().parent.parent / "claude" / "hooks"
 INJECT = str(HOOKS / "inject_convention_pointer.py")
 GATE = str(HOOKS.parent / "harness" / "gate_runner.py")
@@ -36,6 +43,7 @@ def run_hook(script, cwd, extra=None):
         capture_output=True,
         text=True,
         encoding="utf-8",
+        errors="replace",
         timeout=60,
     )
     return p.returncode, p.stdout.strip()

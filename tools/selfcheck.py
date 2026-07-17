@@ -13,12 +13,14 @@ One portable script (not shell one-liners) so it runs the same under cmd.exe and
 """
 
 import glob
+import io
 import json
 import os
 import py_compile
 import re
 import subprocess
 import sys
+import tokenize
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
@@ -33,14 +35,17 @@ except Exception:
 
 errors: list[str] = []
 
-# 1. Scripts compile (everything we deploy and later execute).
-#    skills/*/scripts/ MUST be here: the commit gate runs those via evaluate.recipe, so a
-#    crash there blocks commits. They were outside this list until 2026-07-17, which is
-#    exactly why gen_palette.py's cp949 stdout bug reached a user-facing gate unflagged.
+# 1. Scripts compile — EVERYTHING the gate can execute, not just what we deploy.
+#    The rule that earns a directory a place here: if a crash in it blocks a commit, it
+#    must be scanned. Both skills/*/scripts/ and tools/ were missing on 2026-07-17 —
+#    gen_palette.py's cp949 stdout bug shipped through the first gap, and an independent
+#    evaluator then proved the second: 2 of this repo's own 3 recipe lines ARE tools/
+#    scripts, so leaving tools/ unscanned was the same hole one directory over.
 scripts = (
     sorted(glob.glob(str(REPO / "claude" / "hooks" / "*.py")))
     + sorted(glob.glob(str(REPO / "claude" / "harness" / "*.py")))
     + sorted(glob.glob(str(REPO / "claude" / "skills" / "*" / "scripts" / "*.py")))
+    + sorted(glob.glob(str(REPO / "tools" / "*.py")))
     + [str(REPO / "deploy.py")]
 )
 for s in scripts:
@@ -92,7 +97,12 @@ def is_secret(path: str) -> bool:
 
 try:
     files = subprocess.run(
-        ["git", "ls-files"], cwd=str(REPO), capture_output=True, text=True
+        ["git", "ls-files"],
+        cwd=str(REPO),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
     ).stdout.split()
     bad = [f for f in files if is_secret(f)]
     if bad:
@@ -107,12 +117,49 @@ except Exception as e:
 #     Covers BOTH file I/O and subprocess text capture — the latter was added after the
 #     gate itself shipped a `subprocess.run(text=True)` whose cp949 crash silently passed
 #     a failing commit (2026-07-17). The guard must see every decode site, not just files.
+def _strip_prose(src: str) -> str:
+    """Source minus comments AND docstrings — the parts that are documentation, not code.
+
+    Both guards need it. Prose that merely *mentions* a decode site (this very file
+    explains the bug using `_sp.run(text=` in a comment and a docstring) is not one, and
+    the guard flagged itself until this existed. Same class of mistake as a blind
+    search/replace: never treat prose as code.
+
+    A docstring = a STRING that is the whole statement (its own expression), which is what
+    the INDENT/NEWLINE-preceded check below approximates; ordinary string literals stay,
+    because those are exactly the text that can reach a stream.
+    """
+    try:
+        out, prev_meaningful = [], tokenize.INDENT
+        for t in tokenize.generate_tokens(io.StringIO(src).readline):
+            if t.type == tokenize.COMMENT:
+                continue
+            if t.type == tokenize.STRING and prev_meaningful in (
+                tokenize.INDENT,
+                tokenize.NEWLINE,
+                tokenize.NL,
+                tokenize.DEDENT,
+            ):
+                continue  # bare string statement => docstring
+            out.append(t.string)
+            if t.type not in (tokenize.NL, tokenize.COMMENT):
+                prev_meaningful = t.type
+        return "".join(out)
+    except Exception:
+        return src  # unparseable -> be strict rather than silently permissive
+
+
 def _io_missing_encoding(src: str) -> str | None:
     """Return the offending call kind if any text-decoding call omits encoding=.
 
     Balanced-paren scan, so multi-line calls and nested parens are handled."""
+    src = _strip_prose(src)
+    # Match ANY module alias, not a literal `subprocess.` — `import subprocess as _sp`
+    # decodes identically, and an evaluator slipped `_sp.run(text=True)` straight past the
+    # narrow pattern (2026-07-17). We never call a non-subprocess `x.run(text=True)`, so
+    # widening this costs no false positives.
     sites = [(r"\.(?:read_text|write_text)\(", "read_text/write_text")]
-    sites.append((r"subprocess\.(?:run|check_output|Popen)\(", "subprocess"))
+    sites.append((r"\b\w+\.(?:run|check_output|Popen)\(", "subprocess"))
     for pat, kind in sites:
         for m in re.finditer(pat, src):
             depth, j = 1, m.end()
@@ -130,36 +177,54 @@ def _io_missing_encoding(src: str) -> str | None:
     return None
 
 
-def _prints_nonascii_unguarded(src: str) -> bool:
-    """True if the script writes a NON-ASCII literal to stdout/stderr without first
-    reconfiguring them to UTF-8.
-
-    The third face of the same cp949 trap (2026-07-17): decoding was guarded, but ENCODING
-    our own output wasn't. `gen_palette.py` printed an em-dash, the cp949 console raised
-    UnicodeEncodeError, and — since the gate is fail-closed — every commit was blocked.
-
-    Exempt: text handed to json.dumps() with the default ensure_ascii=True, which escapes
-    non-ascii to \\uXXXX before it ever reaches stdout. Our hooks legitimately put Korean
-    reasons in JSON decisions this way.
-    """
-    if re.search(r"sys\.std(?:out|err)\.reconfigure\(", src):
-        return False
+def _stream_writes(src: str) -> list:
+    """Every print()/sys.stdout|stderr.write() call, as (match, argument-text)."""
+    out = []
     for m in re.finditer(r"\b(?:print|sys\.std(?:out|err)\.write)\(", src):
         depth, j = 1, m.end()
         while j < len(src) and depth:
             depth += {"(": 1, ")": -1}.get(src[j], 0)
             j += 1
-        body = src[m.end() : j]
-        if not any(ord(c) > 127 for c in body):
-            continue
-        if "json.dumps(" in body and "ensure_ascii=False" not in body:
-            continue  # escaped to ascii before it reaches the stream
-        return True
-    return False
+        out.append((m, src[m.end() : j]))
+    return out
 
+
+def _prints_nonascii_unguarded(src: str) -> bool:
+    """True if a script that CAN emit non-ascii to a stream never reconfigures it.
+
+    The third face of the same cp949 trap (2026-07-17): decoding was guarded, but ENCODING
+    our own output wasn't. `gen_palette.py` printed an em-dash, the cp949 console raised
+    UnicodeEncodeError, and — since the gate is fail-closed — every commit was blocked.
+
+    NOT "does a print() call hold a non-ascii literal": that sees only inline text, so
+    `msg = "한글 — em"; print(msg)` sailed through (an evaluator proved it). Data flow isn't
+    statically tractable, so we ask a question that is: strip comments (they never reach a
+    stream), then look for any non-ascii left in a file that writes to one.
+
+    Exempt: files whose stream writes ALL go through json.dumps() at its ensure_ascii=True
+    default — non-ascii is escaped to \\uXXXX before it reaches the stream. That is exactly
+    our hooks' shape (Korean reasons inside a JSON decision) and is genuinely safe; flagging
+    them would be noise, and a guard people learn to ignore protects nothing.
+    """
+    if re.search(r"sys\.std(?:out|err)\.reconfigure\(", src):
+        return False
+    writes = _stream_writes(src)
+    if not writes:
+        return False
+    if all("json.dumps(" in a and "ensure_ascii=False" not in a for _, a in writes):
+        return False
+    return any(ord(c) > 127 for c in _strip_prose(src))
+
+
+# A guard-test file legitimately holds bad-code FIXTURES as string literals, and no static
+# scan can tell those from real decode sites. One narrow, greppable opt-out — not a general
+# escape hatch: it must be this exact phrase, and it is used by exactly one file.
+FIXTURE_MARKER = "selfcheck-exempt: bad-code fixtures, not real call sites"
 
 for s in scripts:
     src = Path(s).read_text(encoding="utf-8")
+    if FIXTURE_MARKER in src:
+        continue
     kind = _io_missing_encoding(src)
     if kind:
         errors.append(

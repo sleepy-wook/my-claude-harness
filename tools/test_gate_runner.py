@@ -14,6 +14,13 @@ import sys
 import tempfile
 from pathlib import Path
 
+try:  # gate-executed script contract: our own output must survive a cp949 console
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
+
 RUNNER = str(
     Path(__file__).resolve().parent.parent / "claude" / "harness" / "gate_runner.py"
 )
@@ -114,7 +121,7 @@ check("K same failure 3x -> stall message", rc != 0 and "STALL" in out, True)
 rc, out = gate(d)
 state = Path(
     subprocess.run(
-        ["git", "rev-parse", "--git-dir"], cwd=d, capture_output=True, text=True
+        ["git", "rev-parse", "--git-dir"], cwd=d, capture_output=True, text=True, encoding="utf-8", errors="replace"
     ).stdout.strip()
 )
 state = (d / state if not state.is_absolute() else state) / "wook-gate-state.json"

@@ -19,6 +19,13 @@ import sys
 import tempfile
 from pathlib import Path
 
+try:  # gate-executed script contract: our own output must survive a cp949 console
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
+
 REPO = Path(__file__).resolve().parent.parent
 GEN = REPO / "claude" / "skills" / "wook-palette" / "scripts" / "gen_palette.py"
 

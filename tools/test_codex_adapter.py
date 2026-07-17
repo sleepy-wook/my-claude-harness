@@ -12,6 +12,13 @@ import subprocess
 import sys
 from pathlib import Path
 
+try:  # gate-executed script contract: our own output must survive a cp949 console
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
+
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
 import deploy  # noqa: E402
@@ -153,7 +160,7 @@ def run_guard(tool_input):
         [sys.executable, GP],
         input=json.dumps({"tool_input": tool_input}),
         capture_output=True,
-        text=True,
+        text=True, encoding="utf-8", errors="replace",
     )
     return p.stdout
 

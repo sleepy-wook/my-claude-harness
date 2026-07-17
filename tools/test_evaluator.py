@@ -15,6 +15,13 @@ import sys
 import tempfile
 from pathlib import Path
 
+try:  # gate-executed script contract: our own output must survive a cp949 console
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
+
 REPO = Path(__file__).resolve().parent.parent
 REMIND = str(REPO / "claude" / "hooks" / "remind_evaluator.py")
 EVALUATOR = REPO / "claude" / "agents" / "wook-evaluator.md"
@@ -31,7 +38,7 @@ def check(name, got, want):
 def run_hook(cwd, command):
     ev = {"cwd": cwd, "tool_input": {"command": command}}
     p = subprocess.run(
-        [sys.executable, REMIND], input=json.dumps(ev), capture_output=True, text=True
+        [sys.executable, REMIND], input=json.dumps(ev), capture_output=True, text=True, encoding="utf-8", errors="replace"
     )
     return p.stdout.strip()
 

@@ -10,6 +10,13 @@ import re
 import sys
 from pathlib import Path
 
+try:  # gate-executed script contract: our own output must survive a cp949 console
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
+
 TEMPLATE = (
     Path(__file__).resolve().parent.parent
     / "claude"

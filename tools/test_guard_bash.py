@@ -11,6 +11,13 @@ import subprocess
 import sys
 from pathlib import Path
 
+try:  # gate-executed script contract: our own output must survive a cp949 console
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
+
 HOOK = str(
     Path(__file__).resolve().parent.parent / "claude" / "hooks" / "guard_bash.py"
 )
@@ -29,7 +36,7 @@ def hook(command):
         [sys.executable, "-B", HOOK],
         input=json.dumps(ev),
         capture_output=True,
-        text=True,
+        text=True, encoding="utf-8", errors="replace",
         timeout=30,
     )
     out = p.stdout.strip()
