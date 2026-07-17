@@ -31,6 +31,11 @@ exec python "$GATE"
 
 
 def main() -> int:
+    try:  # our messages are Korean; a cp949 console would raise while printing them
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
     try:
         out = subprocess.run(
             ["git", "rev-parse", "--git-dir"],

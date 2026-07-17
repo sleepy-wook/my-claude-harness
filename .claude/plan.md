@@ -62,7 +62,17 @@ recipe 불변: `selfcheck` / `tests` / `deploy --check` 전부 exit 0 ✅ (8/8 �
 - **실거래 ✅**: 임시 repo에서 pro-max 원본 토큰 커밋 → **차단**(on_destructive 3.76:1) →
   `--fix` → **커밋 성공** → 누가 on_accent를 흰색으로 되돌림 → **다시 차단**(2.28:1)
 
-## 이 플랜이 부수적으로 잡은 것 (#26)
-실거래 테스트가 **게이트 fail-open 3건**을 드러냄 — `subprocess(text=True)` encoding 누락으로
-cp949 크래시 → 그 크래시가 "통과"로 처리됨. fail-closed 전환 + selfcheck 가드를
-`subprocess`까지 확장 → `remind_evaluator`·`gate_runner.git()`·`install_gate`에서 추가 위반 적발.
+## 이 플랜이 부수적으로 잡은 것 (#26, #27)
+- **#26**: 실거래 테스트가 **게이트 fail-open 3건**을 드러냄 — `subprocess(text=True)` encoding
+  누락으로 cp949 크래시 → 그 크래시가 "통과"로 처리됨. fail-closed 전환 + 가드를
+  `subprocess`까지 확장 → `remind_evaluator`·`gate_runner.git()`·`install_gate` 추가 적발.
+- **#27 (독립 평가자 FAIL)**: 위 "실거래 증명"이 **무효**였음 — 내 셸의 `PYTHONIOENCODING`이
+  가렸고, `run_tests.py`가 같은 변수를 주입해 테스트 13/13이 **깨진 코드를 통과**시켰다.
+  실사용자 환경에선 `gen_palette` stdout 크래시 + #26 fail-closed = **모든 커밋 영구 차단**.
+  진짜 원인은 **selfcheck가 `skills/*/scripts/`를 스캔조차 안 한 것**(게이트가 실행하는 스크립트가
+  가드 커버리지 밖). 수정 후 env var 없이 전 루프 재실증.
+
+> **이 플랜의 교훈(하네스 일반화)**: 초록색 테스트가 초록색 제품을 뜻하지 않는다. 테스트
+> 하네스가 환경을 보정하면 그 결함은 구조적으로 안 보이고, 가드는 **자기가 스캔하는 범위 밖**을
+> 절대 못 지킨다. 그리고 **자기평가는 이 세션에서 2번 연속 틀렸다**(#24, #25) — 독립 평가자가
+> 둘 다 잡았다.

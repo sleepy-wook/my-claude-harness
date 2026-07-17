@@ -33,6 +33,22 @@ import re
 import sys
 from pathlib import Path
 
+
+def _utf8_stdout():
+    """Our own output contains em-dashes; the gate runs us with stdout piped, and on a
+    Windows console/pipe that defaults to cp949 a plain print() raises UnicodeEncodeError.
+    Because the gate is (correctly) fail-closed, that crash would block EVERY commit —
+    which is exactly what shipped on 2026-07-17 and only stayed hidden because the test
+    runner injects PYTHONIOENCODING=utf-8. Every script the gate executes must do this."""
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
+
+_utf8_stdout()
+
 # --- pro-max's schema (data/colors.csv header order) -------------------------
 # CSV column -> our canonical key -> the CSS variable pro-max's stacks expect.
 SCHEMA = [
@@ -206,9 +222,21 @@ def load_tokens(path: str) -> dict:
 
 
 def emit_css(roles: dict, name: str = "tokens") -> str:
+    # State the MEASURED status, never a blanket "verified" claim — these values may come
+    # straight from pro-max, whose palettes fail AA in 571/1517 pairs. Claiming verification
+    # before verifying is the exact thing this harness exists to prevent.
+    a = audit(roles)
+    status = (
+        "WCAG AA: PASS (all enforced text pairs)"
+        if not a["fails"]
+        else "WCAG AA: **FAIL** — "
+        + ", ".join(f"{n} {r}:1" for n, r, _, _ in a["fails"])
+        + "  → run: gen_palette.py --fix"
+    )
     lines = [
-        f"/* {name} — ui-ux-pro-max schema (--color-*), WCAG AA verified by",
-        " * wook-palette gen_palette.py --check. Values live here; components use var(). */",
+        f"/* {name} — ui-ux-pro-max schema (--color-*)",
+        f" * {status}",
+        " * Values live here; components reference var(--color-*), never raw hex. */",
         ":root {",
     ]
     for k in KEYS:

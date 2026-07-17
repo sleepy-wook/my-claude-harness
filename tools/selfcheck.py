@@ -22,12 +22,25 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
+
+# Our messages (and the paths/errors we echo) contain non-ascii; a cp949 console would
+# raise while PRINTING the violation, hiding which file was at fault. Fix stdout first.
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
 errors: list[str] = []
 
-# 1. Scripts compile (hooks + harness runtime scripts + deploy).
+# 1. Scripts compile (everything we deploy and later execute).
+#    skills/*/scripts/ MUST be here: the commit gate runs those via evaluate.recipe, so a
+#    crash there blocks commits. They were outside this list until 2026-07-17, which is
+#    exactly why gen_palette.py's cp949 stdout bug reached a user-facing gate unflagged.
 scripts = (
     sorted(glob.glob(str(REPO / "claude" / "hooks" / "*.py")))
     + sorted(glob.glob(str(REPO / "claude" / "harness" / "*.py")))
+    + sorted(glob.glob(str(REPO / "claude" / "skills" / "*" / "scripts" / "*.py")))
     + [str(REPO / "deploy.py")]
 )
 for s in scripts:
@@ -117,12 +130,47 @@ def _io_missing_encoding(src: str) -> str | None:
     return None
 
 
+def _prints_nonascii_unguarded(src: str) -> bool:
+    """True if the script writes a NON-ASCII literal to stdout/stderr without first
+    reconfiguring them to UTF-8.
+
+    The third face of the same cp949 trap (2026-07-17): decoding was guarded, but ENCODING
+    our own output wasn't. `gen_palette.py` printed an em-dash, the cp949 console raised
+    UnicodeEncodeError, and — since the gate is fail-closed — every commit was blocked.
+
+    Exempt: text handed to json.dumps() with the default ensure_ascii=True, which escapes
+    non-ascii to \\uXXXX before it ever reaches stdout. Our hooks legitimately put Korean
+    reasons in JSON decisions this way.
+    """
+    if re.search(r"sys\.std(?:out|err)\.reconfigure\(", src):
+        return False
+    for m in re.finditer(r"\b(?:print|sys\.std(?:out|err)\.write)\(", src):
+        depth, j = 1, m.end()
+        while j < len(src) and depth:
+            depth += {"(": 1, ")": -1}.get(src[j], 0)
+            j += 1
+        body = src[m.end() : j]
+        if not any(ord(c) > 127 for c in body):
+            continue
+        if "json.dumps(" in body and "ensure_ascii=False" not in body:
+            continue  # escaped to ascii before it reaches the stream
+        return True
+    return False
+
+
 for s in scripts:
-    kind = _io_missing_encoding(Path(s).read_text(encoding="utf-8"))
+    src = Path(s).read_text(encoding="utf-8")
+    kind = _io_missing_encoding(src)
     if kind:
         errors.append(
             f"encoding: {os.path.relpath(s, REPO)} — a {kind} call decodes text without "
             "encoding= (breaks on Windows cp949)"
+        )
+    if _prints_nonascii_unguarded(src):
+        errors.append(
+            f"encoding: {os.path.relpath(s, REPO)} — prints non-ascii without "
+            "sys.stdout.reconfigure(encoding='utf-8') (raises on a cp949 console; with a "
+            "fail-closed gate that blocks every commit)"
         )
 
 # 5. non-failing nudges.

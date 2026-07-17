@@ -13,6 +13,7 @@ Run from the repo root. Exit 0 = all pass.
 """
 
 import importlib.util
+import os
 import subprocess
 import sys
 import tempfile
@@ -40,7 +41,17 @@ def css(roles: dict) -> str:
     return str(p)
 
 
-def run_cli(*args):
+def run_cli(*args, strip_ioenc=False):
+    """strip_ioenc=True reproduces a REAL user's shell.
+
+    run_tests.py injects PYTHONIOENCODING=utf-8 into the environment, which propagates to
+    this grandchild and papers over any stdout-encoding bug. On 2026-07-17 that masked a
+    crash that blocked every commit for real users while the suite stayed 13/13 green.
+    Tests that assert the shipped CLI works must therefore drop the variable.
+    """
+    env = dict(os.environ)
+    if strip_ioenc:
+        env.pop("PYTHONIOENCODING", None)
     p = subprocess.run(
         [sys.executable, "-B", str(GEN), *args],
         capture_output=True,
@@ -48,6 +59,7 @@ def run_cli(*args):
         encoding="utf-8",
         errors="replace",
         timeout=60,
+        env=env,
     )
     return p.returncode, p.stdout + p.stderr
 
@@ -121,6 +133,24 @@ clean_css = "\n".join(
 out_css.write_text(clean_css, encoding="utf-8")
 rc2, out2 = run_cli("--check", str(out_css))
 check("I --fix output passes --check", rc2 == 0, f"rc={rc2}")
+
+print(
+    "Test R-S — works in a REAL shell (no PYTHONIOENCODING) — the 2026-07-17 regression"
+)
+# The suite was 13/13 green while `--check` crashed for every actual user, because
+# run_tests.py injects PYTHONIOENCODING=utf-8. These two drop it on purpose.
+rc, out = run_cli("--check", css(CLEAN), strip_ioenc=True)
+check(
+    "R AA-clean tokens -> exit 0 without PYTHONIOENCODING",
+    rc == 0,
+    f"rc={rc} {out.strip().splitlines()[-1] if out.strip() else ''}",
+)
+rc, out = run_cli("--check", css(CTA_FAIL), strip_ioenc=True)
+check(
+    "S failing tokens -> exit 1 (not a crash) without PYTHONIOENCODING",
+    rc == 1 and "on_accent/accent" in out,
+    f"rc={rc}",
+)
 
 print("Test J — rgba() cells tolerated, never crash")
 rgba = {**CLEAN, "border": "rgba(255,255,255,0.08)"}
