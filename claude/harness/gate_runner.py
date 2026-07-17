@@ -50,9 +50,18 @@ def _utf8_stdout():
 
 
 def git(root, *args):
+    """Run git and decode as UTF-8 — git emits UTF-8 paths/messages, and the Windows
+    locale (cp949) would raise on any Korean filename, which used to leave
+    staged_weakening() with no diff and silently disarm self-protection."""
     try:
         p = subprocess.run(
-            ["git", *args], cwd=str(root), capture_output=True, text=True, timeout=30
+            ["git", *args],
+            cwd=str(root),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=30,
         )
         return p.returncode, p.stdout
     except Exception:
@@ -117,7 +126,12 @@ def find_bash() -> str | None:
             return cand
     try:  # derive from the active git install (handles non-default drives)
         ep = subprocess.run(
-            ["git", "--exec-path"], capture_output=True, text=True, timeout=10
+            ["git", "--exec-path"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=10,
         ).stdout.strip()
         if ep:
             for up in Path(ep).parents:
@@ -141,12 +155,18 @@ def run(cmd: str, cwd: Path):
             cwd=str(cwd),
             capture_output=True,
             text=True,
+            encoding="utf-8",  # NOT the locale default: cp949 crashes on any — or 한글
+            errors="replace",  # in a check's output, and the crash used to pass the gate
             timeout=CHECK_TIMEOUT,
             shell=shell,
         )
         return p.returncode, (p.stdout + p.stderr)
     except Exception as e:
-        return 0, f"(could not run {cmd}: {e})"  # non-blocking
+        # "could not verify" is NOT "verified ok" — same iron law the evaluator follows
+        # (INCONCLUSIVE never becomes PASS). A crashed/timed-out check fails the gate; the
+        # escape hatches are the explicit ones (--no-verify / .claude/evaluate-off), not a
+        # silent pass. This used to `return 0` and hid a real UnicodeDecodeError (2026-07-17).
+        return 1, f"(check could not be run: {e})"
 
 
 # ---- 1. self-protection ------------------------------------------------------

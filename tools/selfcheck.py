@@ -89,25 +89,39 @@ except Exception as e:
 
 
 # 4b. Cross-platform: deployed/runtime scripts must pin text encoding.
-#     Windows defaults to cp949; reading our UTF-8 (Korean) sources without
+#     Windows defaults to cp949; decoding our UTF-8 (Korean, em-dash) text without
 #     encoding="utf-8" crashes there. Enforce it on everything we deploy/run.
-def _io_missing_encoding(src: str) -> bool:
-    """True if any read_text/write_text call omits encoding= (balanced-paren scan,
-    so multi-line calls and nested parens like write_text(json.dumps(x), ...) are ok)."""
-    for m in re.finditer(r"\.(?:read_text|write_text)\(", src):
-        depth, j = 1, m.end()
-        while j < len(src) and depth:
-            depth += {"(": 1, ")": -1}.get(src[j], 0)
-            j += 1
-        if "encoding" not in src[m.end() : j]:
-            return True
-    return False
+#     Covers BOTH file I/O and subprocess text capture — the latter was added after the
+#     gate itself shipped a `subprocess.run(text=True)` whose cp949 crash silently passed
+#     a failing commit (2026-07-17). The guard must see every decode site, not just files.
+def _io_missing_encoding(src: str) -> str | None:
+    """Return the offending call kind if any text-decoding call omits encoding=.
+
+    Balanced-paren scan, so multi-line calls and nested parens are handled."""
+    sites = [(r"\.(?:read_text|write_text)\(", "read_text/write_text")]
+    sites.append((r"subprocess\.(?:run|check_output|Popen)\(", "subprocess"))
+    for pat, kind in sites:
+        for m in re.finditer(pat, src):
+            depth, j = 1, m.end()
+            while j < len(src) and depth:
+                depth += {"(": 1, ")": -1}.get(src[j], 0)
+                j += 1
+            body = src[m.end() : j]
+            # subprocess only decodes when text=True / universal_newlines=True
+            if kind == "subprocess" and not re.search(
+                r"text\s*=\s*True|universal_newlines\s*=\s*True", body
+            ):
+                continue
+            if "encoding" not in body:
+                return kind
+    return None
 
 
 for s in scripts:
-    if _io_missing_encoding(Path(s).read_text(encoding="utf-8")):
+    kind = _io_missing_encoding(Path(s).read_text(encoding="utf-8"))
+    if kind:
         errors.append(
-            f"encoding: {os.path.relpath(s, REPO)} — a read_text/write_text lacks "
+            f"encoding: {os.path.relpath(s, REPO)} — a {kind} call decodes text without "
             "encoding= (breaks on Windows cp949)"
         )
 

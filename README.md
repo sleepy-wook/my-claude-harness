@@ -73,15 +73,35 @@ python deploy.py --target=codex     # ~/.codex 로: hooks.json·skills/·AGENTS.
 | [`/wook-index`](#wook-index) | 재사용 카탈로그 | 지식 |
 | `/wook-audit` | 전체 트리 상시 감사 원장(`.claude/audit/`) | 지식 |
 | `/wook-sandbox` | 격리 제작 → 써보고 → 졸업(실제 경로로 이동) | 제작 |
-| `/wook-palette` | 디자인 흐름의 **토큰 관문** — 추천이 어디서 오든 WCAG AA 계산 통과 후 tokens.css | 디자인 |
+| `/wook-palette` | pro-max 토큰의 **AA 관문** — 걔네 16역할을 CSV서 회수 → 대비 계산 → tokens.css | 디자인 |
 
 > 트리거는 직접 타이핑(`/wook-plan`)하거나, 설명에 맞는 상황이면 Claude가 알아서 제안한다.
 > (`/wook-audit`·`/wook-sandbox`·`/wook-palette`는 상세 절 없이 스킬 본문이 안내 — SKILL.md 참조.)
 
-**디자인 흐름 (2026-07-17~):** 발상·스타일·레이아웃은 서드파티 **ui-ux-pro-max**(107k★,
-`npm i -g ui-ux-pro-max-cli && uipro init --ai claude --global`로 설치·업데이트, repo 밖)가
-메인이고, 하네스는 검증 레이어를 댄다: pro-max 추천 → `/wook-palette`(AA 계산 → tokens →
-conventions) → `/wook-sandbox`(격리 제작) → evaluator+커밋 게이트. (구 `/wook-design`은 폐기.)
+### 디자인 흐름 — **하네스가 pro-max에 맞춘다** (2026-07-17~)
+
+발상·스타일·레이아웃·스키마는 서드파티 **ui-ux-pro-max**(107k★, `npm i -g ui-ux-pro-max-cli
+&& uipro init --ai claude --global`, repo 밖에서 자동 업데이트)가 **메인**이다. 우리는 걔네
+어휘(`--color-*` 16역할)를 그대로 쓰고 — 그래야 걔네 22개 스택 코드 생성이 우리 토큰을 그대로
+먹는다 — 걔가 **안 하는 것 하나**만 얹는다: **대비를 계산해 exit code에 묶는 것.**
+
+```
+ui-ux-pro-max  --design-system     발상·패턴·스타일·타이포 (+ MASTER.md = 디자인 소스 오브 트루스)
+      ↓
+/wook-palette  --from-promax       CSV에서 16역할 회수 (걔네 렌더러는 6役을 버림 — On Accent 포함!)
+               --check / --fix     WCAG AA 계산 → 미달이면 exit 1 / ink만 수리(브랜드색 불변)
+      ↓                            recipe에 tokens-aa 심기 → 이후 커밋 게이트가 강제
+/wook-sandbox                      격리 제작 → 직접 써보고 → 졸업
+      ↓
+wook-evaluator + 커밋 게이트          실제 실행으로 검증
+```
+
+**왜 계산이 필요한가 (실측 2026-07-17):** pro-max 팔레트는 **1517쌍 중 571쌍(37.6%)이 AA 미달**
+— 특히 CTA 글자(`On Accent/Accent`)가 192개 중 **113개**에서 실패한다. 게다가 걔네 렌더러가
+`On Accent` 칸을 화면에 안 보여줘서, 에이전트가 흰색을 추측해 **2.28:1 CTA를 출고한 실사고**가
+있었다(정답 `#0F172A`=7.83:1은 걔네 CSV에 이미 있었다). 걔네 규칙(§1 "대비 4.5:1 = CRITICAL")은
+우리와 같다 — **아는데 계산을 안 할 뿐**이라, 넓이는 걔네 것이고 검증이 우리 몫이다.
+(구 `/wook-design`·프리셋 12종은 폐기 — pro-max 192행 + `--fix`가 상위 호환.)
 
 ---
 

@@ -24,14 +24,20 @@ file, a config), referenced by a `path:symbol` pointer so detail never goes stal
 
 ## What each domain typically covers (a prompt, not a schema — infer the real categories)
 
-- **frontend**: theme (light/dark), color tokens (primary/secondary/danger + hover/active/disabled), spacing scale, typography, component naming.
-  - **Token issuance is single-source: `/wook-palette` only.** Its `gen_palette.py` *computes*
-    WCAG AA and only then emits `tokens.css`; the doc points at that file. Many installed
-    third-party design skills (design-system, brand, ui-styling, slides…) also offer to write
-    tokens/`tailwind.config`/CSS vars — none of them compute contrast (their WCAG lives in prose
-    docs), so a `tokens.css` produced by any other path is NOT accepted: re-issue it through
-    `/wook-palette`. Recommendations from anywhere (ui-ux-pro-max's palette DB included) are
-    *candidates* until that computed check passes.
+- **frontend**: theme (light/dark), color tokens, spacing scale, typography, component naming.
+  - **The design system belongs to ui-ux-pro-max, not to this doc.** If the project ran its
+    `--design-system --persist`, `design-system/MASTER.md` is the source of truth for pattern,
+    style, typography and motion — **point at it, don't restate it**. This doc only adds the
+    project-specific rules pro-max doesn't cover.
+  - **Values belong to `tokens.css` in pro-max's 16-role `--color-*` schema**, minted by
+    `/wook-palette` — which is the only path that *computes* WCAG AA before emitting. Other
+    installed skills (design-system, brand, ui-styling, slides…) will happily write
+    tokens/`tailwind.config`/CSS vars; none of them compute contrast, and pro-max's own
+    palettes fail AA in 571/1517 pairs. So any `tokens.css` from another path is not accepted —
+    re-issue via `/wook-palette --check`. Recommendations from anywhere are *candidates* until
+    that check passes.
+  - Make it enforced, not advisory: add the check to the recipe so the commit gate runs it —
+    `tokens-aa: python ~/.claude/skills/wook-palette/scripts/gen_palette.py --check <path>/tokens.css`
 - **backend**: API response shape, error/HTTP policy, layering (controller/service/repo), naming, validation, logging, pagination.
 - **db**: table/column naming, PK/FK conventions, timestamps, soft-delete, migration rules, indexes, enums.
 - **infra**: resource naming, tagging, module structure, secrets handling, environment promotion.
@@ -80,7 +86,9 @@ Use this to know what to ASK (greenfield) or EXTRACT (brownfield) for the domain
 - Keep it compact; values live in the pointed-at source, not duplicated here.
 - Only stable, reusable conventions — not one-off choices.
 - Enforce only rules that have a real checker; leave the rest as guidance (don't fake a gate).
-- **Color/token authority is `/wook-palette`** — computed AA, then `tokens.css`, then a pointer
-  from here. A third-party skill that auto-triggers and emits raw hex or its own token file
-  bypasses the only computed gate we have; route it back through `/wook-palette` instead.
+- **Design authority is ui-ux-pro-max; token authority is `/wook-palette`.** The design system
+  (pattern/style/type) lives in pro-max's `design-system/MASTER.md` — point at it. The values
+  live in `tokens.css` (its 16-role `--color-*` schema) and only `/wook-palette` mints them,
+  because only it computes AA. A skill that auto-triggers and writes its own token file
+  bypasses the one computed gate we have; route it back through `/wook-palette --check`.
 - Re-run after conventions change so the doc stays current (or update it inline per core-rules).

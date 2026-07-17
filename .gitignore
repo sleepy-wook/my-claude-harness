@@ -10,3 +10,6 @@ Thumbs.db
 .DS_Store
 .vscode/
 .idea/
+
+# /wook-sandbox — 격리 제작용 스크래치, 졸업 전까지 히스토리 오염 금지
+sandbox/

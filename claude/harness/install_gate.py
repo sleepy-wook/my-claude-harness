@@ -36,6 +36,8 @@ def main() -> int:
             ["git", "rev-parse", "--git-dir"],
             capture_output=True,
             text=True,
+            encoding="utf-8",  # not the locale default (cp949 raises on non-ascii paths)
+            errors="replace",
             timeout=15,
         )
     except Exception as e:

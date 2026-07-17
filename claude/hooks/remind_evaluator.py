@@ -82,8 +82,16 @@ def find_claude_root(start: Path) -> Path | None:
 
 
 def git(root: Path, *args: str) -> str:
+    """UTF-8, not the locale default — a Korean commit message or path would otherwise
+    raise UnicodeDecodeError on Windows (cp949) and kill the reminder."""
     return subprocess.run(
-        ["git", *args], cwd=str(root), capture_output=True, text=True, timeout=20
+        ["git", *args],
+        cwd=str(root),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=20,
     ).stdout
 
 

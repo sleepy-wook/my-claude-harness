@@ -120,6 +120,18 @@ state = Path(
 state = (d / state if not state.is_absolute() else state) / "wook-gate-state.json"
 check("L pass clears stall state", rc == 0 and not state.exists(), True)
 
+print("Test O-Q — a check that cannot run must NOT pass (fail-closed) + utf-8 output")
+# Regression (2026-07-17): run() used locale decoding (cp949 on Windows) so a check whose
+# output contained an em-dash or Korean crashed the reader thread — and the handler
+# `return 0` turned that crash into a PASS, letting a genuinely failing commit through.
+d = repo(recipe="unicode: python -c \"print('대비 미달 — FAIL'); exit(1)\"\n")
+rc, out = gate(d)
+check("O non-ascii FAILING output -> still blocks", rc != 0, True)
+check("P non-ascii text survived decoding", "대비 미달" in out, True)
+d = repo(recipe="ok: python -c \"print('통과 — OK')\"\n")
+rc, out = gate(d)
+check("Q non-ascii PASSING output -> allows", rc == 0, True)
+
 print("Test M-N — pointer freshness warns, never blocks")
 d = repo(recipe="ok: true\n")
 idx = d / ".claude" / "reuse-index"
