@@ -25,7 +25,17 @@ SHIM = f"""#!/bin/sh
 # Bypass: git commit --no-verify   |   Disable: create .claude/evaluate-off
 GATE="$HOME/.claude/harness/gate_runner.py"
 [ -f "$GATE" ] || exit 0   # harness not deployed on this machine -> never trap
-exec python "$GATE"
+# Pick an interpreter that actually WORKS, not merely one that exists. A bare `python` is
+# absent on many Linux installs (Debian/Ubuntu without python-is-python3) and elsewhere is
+# a Python 2 or a broken stub; `exec python` then exits non-zero and — with a fail-closed
+# gate — blocks EVERY commit in the repo. So probe each candidate first. No usable
+# interpreter = no gate, never a trap.
+for PY in python3 python; do
+  command -v "$PY" >/dev/null 2>&1 || continue
+  "$PY" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 8) else 1)' 2>/dev/null || continue
+  exec "$PY" "$GATE"
+done
+exit 0
 """
 
 
@@ -35,22 +45,31 @@ def main() -> int:
         sys.stderr.reconfigure(encoding="utf-8", errors="replace")
     except Exception:
         pass
-    try:
-        out = subprocess.run(
-            ["git", "rev-parse", "--git-dir"],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",  # not the locale default (cp949 raises on non-ascii paths)
-            errors="replace",
-            timeout=15,
-        )
-    except Exception as e:
-        print(f"install_gate: git not available ({e})")
-        return 1
-    if out.returncode != 0:
+    # --git-common-dir, not --git-dir: in a linked worktree the latter returns
+    # `.git/worktrees/<name>`, and git never runs hooks from there — the gate would be
+    # installed where nothing executes it (observed 2026-09-21, #30). The common dir is
+    # the main `.git`, which is where hooks actually live for every worktree. Falls back
+    # to --git-dir on git < 2.5, where the two are always the same anyway.
+    git_dir = None
+    for flag in ("--git-common-dir", "--git-dir"):
+        try:
+            out = subprocess.run(
+                ["git", "rev-parse", flag],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",  # not the locale default (cp949 raises on non-ascii paths)
+                errors="replace",
+                timeout=15,
+            )
+        except Exception as e:
+            print(f"install_gate: git not available ({e})")
+            return 1
+        if out.returncode == 0 and out.stdout.strip():
+            git_dir = Path(out.stdout.strip()).resolve()  # may be relative to cwd
+            break
+    if git_dir is None:
         print("install_gate: not inside a git repository")
         return 1
-    git_dir = Path(out.stdout.strip()).resolve()
 
     hook = git_dir / "hooks" / "pre-commit"
     if hook.exists():

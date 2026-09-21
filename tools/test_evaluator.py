@@ -10,6 +10,7 @@ these cover the deterministic pieces. Run from the repo root. Exit 0 = all pass.
 
 import json
 import shutil
+import os
 import subprocess
 import sys
 import tempfile
@@ -35,10 +36,30 @@ def check(name, got, want):
     print(f"  [{'PASS' if ok else 'FAIL'}] {name}: got={got!r} want={want!r}")
 
 
+def clean_env(**extra):
+    """os.environ minus every `GIT_*` key (see test_gate_runner.clean_env).
+
+    A git hook exports GIT_DIR / GIT_INDEX_FILE / GIT_WORK_TREE to its children, so a
+    subprocess that inherits them operates on the REAL repository instead of the throwaway
+    one — that is how #30 corrupted the harness repo. Every git call AND every hook we
+    spawn (remind_evaluator shells out to git itself) must use this env.
+    """
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    env["PYTHONIOENCODING"] = "utf-8"
+    env.update(extra)
+    return env
+
+
 def run_hook(cwd, command):
     ev = {"cwd": cwd, "tool_input": {"command": command}}
     p = subprocess.run(
-        [sys.executable, REMIND], input=json.dumps(ev), capture_output=True, text=True, encoding="utf-8", errors="replace"
+        [sys.executable, REMIND],
+        input=json.dumps(ev),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        env=clean_env(),
     )
     return p.stdout.strip()
 
@@ -46,18 +67,20 @@ def run_hook(cwd, command):
 def repo_with_commit(fname, n_lines, claude=True):
     """Throwaway git repo whose HEAD is a fresh commit touching fname (n_lines)."""
     d = tempfile.mkdtemp(prefix="eval_")
-    subprocess.run("git init -q", cwd=d, shell=True, check=True)
+    e = clean_env()  # every git call below, not just the first (#32 follow-up)
+    subprocess.run("git init -q", cwd=d, shell=True, check=True, env=e)
     if claude:
         (Path(d) / ".claude").mkdir()
     (Path(d) / fname).write_text(
         "\n".join(f"x{i} = {i}" for i in range(n_lines)) + "\n", encoding="utf-8"
     )
-    subprocess.run(f"git add -A", cwd=d, shell=True, check=True)
+    subprocess.run("git add -A", cwd=d, shell=True, check=True, env=e)
     subprocess.run(
         "git -c user.email=t@t -c user.name=t commit -q -m x",
         cwd=d,
         shell=True,
         check=True,
+        env=e,
     )
     return d
 

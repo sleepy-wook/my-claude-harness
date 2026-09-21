@@ -59,8 +59,13 @@ Generator implements; the gate (a git `pre-commit` hook) enforces it at commit t
      accumulate completed specs here. (While plan.md exists, its acceptance criteria are
      re-injected each turn by the plan-pointer hook, so keep that section tight.)
 
-6. **Hand off to implementation.** Build against the spec. Do NOT claim done until the recipe
-   passes — the **pre-commit gate** runs exactly these checks on `git commit` and blocks the
+6. **Hand off to implementation.** For work that will run long and has a *verifiable* end state
+   (a migration until every call site compiles, a backlog until the queue is empty), offer the
+   native `/goal <condition>`: it re-checks the condition after every turn with a separate small
+   model and keeps going without per-turn prompting, stopping when the condition holds or it is
+   judged impossible. It complements the gate rather than replacing it — `/goal` decides *when to
+   keep going*, the commit gate decides *what may land*. Build against the spec. Do NOT claim done
+   until the recipe passes — the **pre-commit gate** runs exactly these checks on `git commit` and blocks the
    commit until they pass (for any agent AND for human commits); `/wook-evaluate` gives a deeper
    on-demand verdict. The verdict is bound to real exit codes. The gate also refuses commits
    whose staged diff weakens the gate itself (recipe edits / test deletions) unless committed

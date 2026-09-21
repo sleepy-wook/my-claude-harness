@@ -33,12 +33,29 @@ def check(name, got, want):
     print(f"  [{'PASS' if ok else 'FAIL'}] {name}: got={got!r} want={want!r}")
 
 
+def clean_env(**extra):
+    """os.environ minus every `GIT_*` key (plus a UTF-8 stdio pin).
+
+    A git hook exports GIT_DIR / GIT_INDEX_FILE / GIT_WORK_TREE to its children. These
+    tests create throwaway repos, so inheriting those makes `git init`, `git add` and the
+    gate itself operate on the REAL repository instead. That is not hypothetical: on
+    2026-09-21 (#30) an evaluation ran this suite from inside a pre-commit hook in a linked
+    worktree and it rewrote the harness repo's index, flipped `core.bare` to true and
+    injected a `[user]` section. Every subprocess here must use this env.
+    """
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    env["PYTHONIOENCODING"] = "utf-8"
+    env.update(extra)
+    return env
+
+
 def repo(recipe="gate: test -f PASS\n", passing=True, git=True):
     d = Path(tempfile.mkdtemp(prefix="gaterun_"))
     if git:
-        subprocess.run(["git", "init", "-q"], cwd=d, check=True)
-        subprocess.run(["git", "config", "user.email", "t@t"], cwd=d, check=True)
-        subprocess.run(["git", "config", "user.name", "t"], cwd=d, check=True)
+        e = clean_env()
+        subprocess.run(["git", "init", "-q"], cwd=d, check=True, env=e)
+        subprocess.run(["git", "config", "user.email", "t@t"], cwd=d, check=True, env=e)
+        subprocess.run(["git", "config", "user.name", "t"], cwd=d, check=True, env=e)
     (d / ".claude").mkdir()
     if recipe is not None:
         (d / ".claude" / "evaluate.recipe").write_text(recipe, encoding="utf-8")
@@ -48,7 +65,7 @@ def repo(recipe="gate: test -f PASS\n", passing=True, git=True):
 
 
 def gate(d, env_extra=None):
-    env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
+    env = clean_env()
     env.pop("GATE_EDIT_OK", None)
     if env_extra:
         env.update(env_extra)
@@ -66,8 +83,11 @@ def gate(d, env_extra=None):
 
 
 def commit_all(d, msg="init"):
-    subprocess.run(["git", "add", "-A"], cwd=d, check=True)
-    subprocess.run(["git", "commit", "-q", "--no-verify", "-m", msg], cwd=d, check=True)
+    e = clean_env()
+    subprocess.run(["git", "add", "-A"], cwd=d, check=True, env=e)
+    subprocess.run(
+        ["git", "commit", "-q", "--no-verify", "-m", msg], cwd=d, check=True, env=e
+    )
 
 
 print("Test A-F — recipe execution basics")
@@ -94,7 +114,7 @@ commit_all(d)  # recipe now tracked
 (d / ".claude" / "evaluate.recipe").write_text(
     "ok: true\n# weakened\n", encoding="utf-8"
 )
-subprocess.run(["git", "add", "-A"], cwd=d, check=True)
+subprocess.run(["git", "add", "-A"], cwd=d, check=True, env=clean_env())
 rc, out = gate(d)
 check("G staged recipe edit -> blocked + hint", rc != 0 and "GATE_EDIT_OK" in out, True)
 rc, out = gate(d, {"GATE_EDIT_OK": "1"})
@@ -102,12 +122,12 @@ check("H GATE_EDIT_OK=1 -> allowed", rc, 0)
 d = repo(recipe="ok: true\n")
 (d / "test_thing.py").write_text("def test_x():\n    pass\n", encoding="utf-8")
 commit_all(d)
-subprocess.run(["git", "rm", "-q", "test_thing.py"], cwd=d, check=True)
+subprocess.run(["git", "rm", "-q", "test_thing.py"], cwd=d, check=True, env=clean_env())
 rc, out = gate(d)
 check("I staged test deletion -> blocked", rc != 0 and "GATE_EDIT_OK" in out, True)
 d = repo(recipe=None)  # adding a recipe for the first time = arming, not weakening
 (d / ".claude" / "evaluate.recipe").write_text("ok: true\n", encoding="utf-8")
-subprocess.run(["git", "add", "-A"], cwd=d, check=True)
+subprocess.run(["git", "add", "-A"], cwd=d, check=True, env=clean_env())
 rc, out = gate(d)
 check("J staged recipe ADD -> allowed", rc, 0)
 
@@ -121,7 +141,13 @@ check("K same failure 3x -> stall message", rc != 0 and "STALL" in out, True)
 rc, out = gate(d)
 state = Path(
     subprocess.run(
-        ["git", "rev-parse", "--git-dir"], cwd=d, capture_output=True, text=True, encoding="utf-8", errors="replace"
+        ["git", "rev-parse", "--git-dir"],
+        cwd=d,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        env=clean_env(),
     ).stdout.strip()
 )
 state = (d / state if not state.is_absolute() else state) / "wook-gate-state.json"
@@ -152,8 +178,25 @@ rc, out = gate(d)
 check("M stale pointer -> exit 0 + warning", rc == 0 and "missing_fn" in out, True)
 check("N valid pointer not flagged", "good_fn" not in out, True)
 
-for p in Path(tempfile.gettempdir()).glob("gaterun_*"):
-    shutil.rmtree(p, ignore_errors=True)
+print("Test R — GIT_* from a hook environment never leaks into the throwaway repos")
+# Regression (2026-09-21 #30): run from inside a pre-commit hook in a linked worktree,
+# git's exported GIT_DIR/GIT_INDEX_FILE made these tests rewrite the REAL harness repo.
+os.environ["GIT_DIR"] = str(Path(tempfile.mkdtemp(prefix="leak_")) / "not-a-repo")
+try:
+    check(
+        "R clean_env drops every GIT_* key",
+        any(k.startswith("GIT_") for k in clean_env()),
+        False,
+    )
+    dk = repo(recipe="ok: true\n")
+    check("R repo() still inits its OWN repo", (dk / ".git").is_dir(), True)
+    check("R gate still runs in the throwaway repo", gate(dk)[0], 0)
+finally:
+    os.environ.pop("GIT_DIR", None)
+
+for pat in ("gaterun_*", "leak_*"):
+    for p in Path(tempfile.gettempdir()).glob(pat):
+        shutil.rmtree(p, ignore_errors=True)
 
 print(f"\nRESULT: {sum(results)}/{len(results)} passed")
 sys.exit(0 if all(results) else 1)
