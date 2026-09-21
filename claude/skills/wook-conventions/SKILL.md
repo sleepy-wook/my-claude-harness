@@ -6,8 +6,8 @@ description: Use to set up or refresh a project's coding conventions for a domai
 # /wook-conventions — establish or extract a domain's conventions
 
 Write a per-domain convention doc at `.claude/conventions/<domain>.md` so future turns
-follow consistent rules (theme/colors, API shape, naming, etc.). The `inject_convention_pointer`
-hook then surfaces it every turn; machine-checkable rules go into `.claude/evaluate.recipe`
+follow consistent rules (theme/colors, API shape, naming, etc.). `.claude/rules/harness-catalog.md`
+surfaces it once at session start; machine-checkable rules go into `.claude/evaluate.recipe`
 so the gate enforces them.
 
 A convention doc keeps RULES, not values — values live in the real source (a theme/tokens
@@ -80,7 +80,8 @@ Use this to know what to ASK (greenfield) or EXTRACT (brownfield) for the domain
   doc AND propose the matching command for `.claude/evaluate.recipe` — use whatever tool fits
   the domain (frontend `style: npx stylelint …` banning raw hex; db `db-naming: python
   scripts/check_naming.py`; backend an eslint/test check). The doc↔gate stay paired.
-- Create `.claude/conventions/` if missing — its presence turns the convention pointer on.
+- Create `.claude/conventions/` if missing.
+- **`.claude/rules/harness-catalog.md`도 같이 쓴다** (없으면 `~/.claude/harness/rules.catalog.example`에서 복사, 있으면 도메인 목록만 갱신). 이 파일이 세션 시작 시 1회 로드되어 "어떤 카탈로그가 어디 있는지"를 알린다 — 매 턴 주입하던 포인터 훅을 대체한 운반체다.
 
 ## Rules
 - Keep it compact; values live in the pointed-at source, not duplicated here.

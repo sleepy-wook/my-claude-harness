@@ -33,6 +33,8 @@ different files is independent, so this is safe — keep the *writing* in your h
    conventions from each domain's code, flag inconsistencies for the developer to resolve.
 4. **`reuse-index/<domain>.md`** — follow `/wook-index`: compact `name · desc · path:symbol` per
    reusable piece.
+5. **`rules/harness-catalog.md`** — copy `~/.claude/harness/rules.catalog.example` and fill in the
+   domain lists from 3 and 4. It loads once per session and points future turns at both catalogs.
 
 ## Step 3 — propose, then write on approval
 - **Show a summary BEFORE writing**: the file list to be created/refreshed, the proposed

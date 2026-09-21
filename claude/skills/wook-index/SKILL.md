@@ -7,8 +7,8 @@ description: Use to build or refresh this project's reuse catalog (`.claude/reus
 
 Scan the project and write a per-domain reuse manifest, so future turns reuse existing
 code from a short index instead of re-reading everything or duplicating it. This is the
-generator for the reuse catalog; the `inject_reuse_pointer` hook then surfaces the domains
-automatically every turn.
+generator for the reuse catalog; `.claude/rules/harness-catalog.md` then surfaces the domains
+at session start.
 
 ## Steps
 
@@ -29,10 +29,14 @@ automatically every turn.
 4. **Write each domain** to `.claude/reuse-index/<domain>.md` (create the dir). The manifest
    is an INDEX, not docs: one line each, compact.
 
-5. **Verify pointers.** Every `path:symbol` must actually exist in the code. Re-read to
+5. **Write `.claude/rules/harness-catalog.md`** too — copy it from
+   `~/.claude/harness/rules.catalog.example` if absent, else just refresh its domain list.
+   It loads once at session start and tells every future turn which catalogs exist and where.
+
+6. **Verify pointers.** Every `path:symbol` must actually exist in the code. Re-read to
    confirm; drop or fix any entry that doesn't resolve (no stale pointers).
 
-6. **Report** which domains and how many entries you wrote.
+7. **Report** which domains and how many entries you wrote.
 
 ## Rules
 
@@ -40,6 +44,6 @@ automatically every turn.
   stays small and the detail never goes stale.
 - Only include reusable, reasonably stable things. Churn-y internals add noise.
 - Re-run after adding shared code so the index stays current.
-- Activation is automatic: once `.claude/reuse-index/` exists, the reuse pointer hook tells
-  every future turn which domains are available, and to check the relevant one before
-  writing new code.
+- Activation is the rules file: `.claude/rules/harness-catalog.md` is loaded at session start,
+  so every future turn knows which domains exist and to check the relevant one before
+  writing new code. Keep its domain list in sync when you add or remove a domain.

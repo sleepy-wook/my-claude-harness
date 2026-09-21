@@ -109,6 +109,7 @@
 | 2026-07-17 | #25 **방향 역전: 하네스를 pro-max 스키마에 맞춤** — 걔네 16역할 `--color-*` 채택, 우리 어휘 폐기 | 형욱: "우리 구조에 맞추기보다 pro-max에 우리 하네스를 맞춰라". #24의 conventions 명문화가 **순수 권고**였음이 독립 평가자에게 FAIL 판정을 받았고(임시 repo 실증: raw hex 박힌 CSS staged → 게이트 exit 0, `[강제: style]` 마커는 아무도 파싱 안 하는 죽은 텍스트), 실사용 시험이 그걸 확증. **실측 3층**: ① 걔네 **스키마 16역할 > 우리 10역할**(`On Accent`·`Muted Foreground`·`Card`/`Card Foreground`·`On Destructive`까지 보유) → 채택 ② 걔네 **렌더러가 16 중 6을 버림**(`design_system.py:448-457`이 10개만 출력) → 에이전트가 on-accent를 못 보고 흰색 추측 → **CTA 2.28:1을 sandbox에 실제로 출고**(데이터엔 `#0F172A`=7.83:1가 이미 있었음) ③ 걔네 **값은 1517쌍 중 571쌍(37.6%) AA 실패**(`On Accent/Accent` 113건, `Muted Foreground/Muted` 150, `Border/Background` 173, `On Primary` 50, `On Secondary` 64, `On Destructive` 21). **결론: 올바른 칸을 가졌는데 값이 틀렸고 그 칸을 화면에 안 보여줌** → 우리 층 = 계산·수리·강제. 구현: `gen_palette.py`를 16역할 네이티브로 재작성(**CSV 직접 읽기**, 렌더러 출력 ✗), `--check`(텍스트 쌍 미달 → exit 1), `--fix`(**ink만** 조정, 브랜드색 불변; 팔레트 자체 앵커 재사용 → pro-max 디자이너 정답 `#0F172A`를 **독립 재현**), `rgba()` 19셀 관용. Border 3:1은 **경고만**(형욱 결정: 1.4.11은 UI 식별 경계만 대상, 173/192 실패라 강제 시 오탐 폭발). 프리셋 12종+test_presets **폐기**(형욱 결정 — 우리 10역할 어휘라 안 맞고, 192행+`--fix`가 상위 호환). conventions는 **MASTER.md에 위임**(소유권 안 뺏음)+recipe에 `tokens-aa` 심기 지시. test_promax_tokens 13/13(픽스처+통합; **571 같은 숫자는 안 박음** — npm 자동 업데이트로 깨지므로 불변식만 검증, pro-max 미설치 시 graceful skip) |
 | 2026-07-17 | #24 번들 6종 감사 → **adopt 0 · `design` 제거 · 토큰 발행권 명문화** | #23의 번들 동반 설치분(banner-design·brand·design·design-system·slides·ui-styling)을 멀티에이전트로 코드 레벨 감사(스킬당 1 에이전트 + 종합). **결정적 발견: 6종 중 어느 것도 WCAG 대비를 코드로 계산하지 않음**(전부 references md에 산문/표로만) → 색·토큰이 겹치는 전 스킬이 예외 없이 `/wook-palette`(gen_palette가 실제 계산 후 발행)보다 열등 → **편입 0**. 근거 요약: brand=RGB 채널 가산 스케일(색이론 아님)·`semantic.error=primary.500` 미완성 매핑·`tokens.brand`에 'ClaudeKit Marketing' 하드코딩 / design-system=JSON→CSS 변환기일 뿐, 슬라이드부는 `parents[4]` 경로 오산으로 미동작+SKILL.md와 코드 자기모순 / ui-styling=구식 HSL 트리플·Tailwind v4가 대체한 JS config·'museum-quality' 자기채점(우리 철학 반대) / slides=654줄에 WCAG 0회·폴백 raw hex / banner-design=핵심 2단계가 미설치 의존 5개에 매달린 죽은 지시. 보안은 6종 전부 코드 레벨 clean(악성 0) — 실질 리스크는 무확인 덮어쓰기(brand: assets/design-tokens.json, ui-styling: cwd/tailwind.config.ts). **remove 1종 = `design`**: 이름이 그냥 `design`+description이 design tokens/system/brand identity/UI styling까지 삼킨 최광폭인데 고유가치(Gemini 로고·CIP·아이콘)는 GEMINI_API_KEY 미설정+google-genai 미설치로 전부 죽음(가치는 가정법, 해는 현재형) → `~/.claude/removed-skills/design`으로 이동(35파일 보존, 복구 가능). **함정 발견: `skills/` 안에서 점 접두사로 이름 바꿔도 스킬은 그대로 로드됨 → 트리 바깥으로 빼야 함**(실측). 나머지 5종은 leave(보안 무해+트리거는 패밀리 문제라 개별 삭제로 해결 안 됨). **구조적 방어: wook-conventions에 "토큰 발행은 /wook-palette 단독, 계산된 AA 통과 없이 생성된 tokens.css는 반려" 명문화** — 어떤 서드파티가 자동발동해 토큰을 뱉든 게이트에서 걸림. 하베스트 후보(미실행): 덱 서사 전략(Duarte 스파크라인·감정 아크)+카피 공식 = uipro에도 우리 스택에도 없는 유일한 공백, 원본은 design-system/data/slide-{strategies,copy}.csv |
 | 2026-07-17 | #23 **디자인 메인 = ui-ux-pro-max**(서드파티, 107k★, MIT) 정식 채택 — wook-design **폐기** | 형욱 결정(2안): 커뮤니티 최대 디자인 스킬(스타일 84·팔레트 192·폰트 74, BM25 검색 스크립트, 15+ 에이전트 지원)을 `uipro init --ai claude --global`로 설치해 **자동 업데이트 유지**(vendoring 명시 거부, 우리 조정 소실 수용). 흐름 재편: **pro-max(발상·추천) → wook-palette(AA 계산 관문 → tokens.css → conventions 포인터) → wook-sandbox(격리 제작) → evaluator+게이트(검증)**. wook-design 완전 삭제(웹 모드=pro-max가 소유, 게임 UI 레퍼런스 소실 수용), **presets 12종+test_presets는 wook-palette로 이전**(AA 강제 유지 — 걔네 192종은 대비 미검증이라 "추천은 어디서 오든 gen_palette AA 통과해야 tokens" 규칙 명문화). 실측: search.py 샘플 쿼리 exit 0·디자인 시스템 출력, 보안 리뷰(전 .py 네트워크/서브프로세스/eval 없음 — COLORTERM env 1건뿐). 주의: init이 **번들 7종** 설치(banner-design·brand·design·design-system·slides·ui-styling 동반 — design은 Gemini API 호출 스크립트 포함), 정책은 형욱 결정 대기. 설치물은 repo 밖 머신-로컬(deploy 파이프라인 무관, 원격 클론 테스트 비의존) |
+| 2026-09-21 | #31 **Claude-only 정렬 2/4 — 포인터 훅 2개 → `.claude/rules/`**(매 턴 spawn 3→1) · **2-a는 조사 결과로 취소** | 원래 계획의 2-a(`guard_paths` 훅 → `permissions` 규칙 교체)를 **내 근거가 틀려서 취소**: "네이티브 deny가 bypass에서도 유지"는 내가 **샌드박싱 절 문장을 오독**한 것이고, 공식 문서는 반대다 — 훅은 "fire before any permission-mode check… deny **blocks the tool even in `bypassPermissions`**", bypass 모드는 "skips permission prompts, **including for writes to protected paths such as `.git` and `.claude`**". 즉 **훅이 더 단단한 바닥**이고, Bash(`cat`/`sed`/`tee`/리다이렉트)로 키·`.git`을 건드린 실패는 관측된 적 없음 → Ratchet 위반 회피. `guard_paths`·`guard_bash` 불변. 실제로 한 것(2-b): `inject_reuse_pointer`·`inject_convention_pointer` **삭제** + `UserPromptSubmit` 등록 3→1(`inject_plan_pointer`만). 근거는 **중복**이었다 — `core-rules.md`(→`~/.claude/CLAUDE.md`, 모든 세션 상시 로드)가 이미 '카탈로그 있으면 먼저 확인'·'컨벤션 따르고 최신 유지'를 담고 있어 두 훅이 매 턴 더 준 건 **도메인 목록+경로뿐**. 대체 운반체 = `claude/harness/rules.catalog.example` → 프로젝트 `.claude/rules/harness-catalog.md`(`paths:` 없음 = 세션 시작 1회 로드, CLAUDE.md와 동일 우선순위), 카탈로그를 만드는 스킬 3개(`wook-conventions`·`wook-index`·`wook-onboard`)가 함께 쓰도록 개정. `test_conventions.py`는 Test 2(훅 주입)만 제거하고 Test 3(스테일 포인터=게이트 경고)·Test 4(규칙=게이트 강제) 유지(4/4). **#30 교훈 적용**: 편집 직후 `git grep`을 돌려 스킬·example에 남은 훅 참조 3건을 잡음(문서만 고치고 끝낼 뻔). 잔여: 배포된 `~/.claude/hooks/inject_*_pointer.py`는 deploy가 prune 안 해 남지만 **미등록=비활성**(무해, prune은 위험해서 별건). selfcheck 21 스크립트·run_tests **10/10**·deploy --check 0 |
 | 2026-09-21 | #30 **Claude-only 정렬 1/4 — Codex 어댑터 삭제**(기능 손실 0) | 형욱: "Claude Code만 사용하니 Claude 쪽으로 맞춰라 — 전부 진행, 하나씩". 9월 리서치(harness/loop/graph = 같은 목적의 층위, 우리 철학은 담론 정중앙, 빈 곳은 **측정**)에서 나온 4단계 중 첫 단계. 제거: `deploy.py`의 `--target`·`codex_text`·`build_codex_hooks_json`·`build_agents_md`·`build_evaluator_toml`·`_strip_frontmatter`·`deploy_codex`(298→154줄, `copy_tree` transform 분기 제거), `guard_paths`/`format_py`의 `tool_input["path"]`·`.codex` 폴백, `install_gate`의 `~/.codex` 폴백, README §멀티에이전트, core-rules.README Codex 운반체. `tools/test_codex_adapter.py` 삭제하되 거기 **섞여 있던 Claude 쪽 단언은 이동**(안 하면 CLAUDE.md 운반체·guard_paths가 무테스트): `copy_tree` write_bytes 회귀 + `build_user_claude_md` 4성질 → `test_deploy.py`(8/8), guard_paths deny/allow/ask → `test_guard_paths.py`(9/9). 새 테스트가 #28 인코딩 가드에 즉시 걸림(한글 리터럴 + reconfigure 누락) → 가드가 제 역할, 수정. 실거래: 테스트 삭제 커밋을 게이트가 `GATE_EDIT_OK` 없이 차단 → `GATE_EDIT_OK=1`로 통과. selfcheck 23 스크립트·run_tests **10/10**·deploy --check 0·`git grep -i codex` 0(docs·plan 제외). **독립 평가자 FAIL(narrow) → 수정**: 그 grep이 새 테스트 2개 docstring('Codex-adapter test')에 걸림 — 내 사전 검증은 파일이 **untracked일 때 `git grep`을 돌려** 놓쳤다(교훈: 스테이징 뒤에 돌리거나 `--untracked`). docstring 정정으로 해소, 이 행의 '0' 주장도 그때 정정. 평가 중 **사고**: 평가자가 메인 repo에 `git worktree`로 실거래 → `test_gate_runner.py`가 훅 환경의 `GIT_DIR`을 상속해 **공유 repo를 변조**(`core.bare=true`, `[user] t@t` 주입) → 세션 stop-hook까지 깨져 수동 복구. 근본 원인 2건은 #30 범위 밖 → **후속 등록**: (a) `test_gate_runner`가 subprocess env의 `GIT_*`를 안 지움 (b) `install_gate`가 `--git-dir`이라 linked worktree에선 git이 실행 안 하는 위치에 훅 설치(→ `--git-common-dir`). 새 규칙(실패에서 나옴): **평가자 실거래는 worktree가 아니라 scratchpad `git clone` 사본에서**. 이어서 2) permissions/rules, 3) plugin eval, 4) SessionStart 게이트 자동설치 |
 
 ---
@@ -251,6 +252,7 @@
 - **파일:**
   - `~/.claude/hooks/inject_reuse_pointer.py` — UserPromptSubmit(2번째 핸들러). `.claude/reuse-index/`
     있으면 매 턴 **도메인 목록 포인터만** 주입(본문 아님), 없으면 무출력. "파일 존재=ON" 패턴.
+    → **폐기**(2026-09-21 #31): 운반체가 `.claude/rules/harness-catalog.md`(세션 시작 1회 로드)로 이전.
   - `~/.claude/skills/wook-index/SKILL.md` — `/wook-index`: 코드 훑어 도메인별 매니페스트 생성/갱신(semi-auto).
 - **동작:** (매 턴) 포인터로 도메인 인지 → AI가 작업 도메인 매니페스트 1개만 Read → 실제 소스 Read → 재사용.
 - **검증(실제 실행):** 멀티도메인 샘플로 — 포인터 hook(있으면 도메인 주입/없으면 무출력) ✓,
@@ -278,6 +280,7 @@
 - **파일:**
   - `~/.claude/hooks/inject_convention_pointer.py` — UserPromptSubmit(3번째). conventions 있으면
     매 턴 "shared 항상 + 도메인별 읽어라" 포인터만 주입, 없으면 무출력. (reuse 포인터의 형제)
+    → **폐기**(2026-09-21 #31): 운반체가 `.claude/rules/harness-catalog.md`(세션 시작 1회 로드)로 이전.
   - `~/.claude/hooks/check_convention_pointers.py` — Stop(비차단, 형제). 코드 변경 시 컨벤션
     포인터(`path:symbol`) 해석 검사 → 스테일이면 "갱신/`/wook-conventions`" **알림만**.
   - `~/.claude/skills/wook-conventions/SKILL.md` — `/wook-conventions` **bimodal**: greenfield=질문하며
@@ -431,14 +434,14 @@ LLM 평가자(서브에이전트)만 가능(결정론 셸 게이트는 브라우
 ~/.claude/
 ├─ settings.json                     # hooks 등록(PreToolUse, PostToolUse, UserPromptSubmit) — Stop 없음
 ├─ CLAUDE.md                          # #19 상시 규칙(marked block, deploy가 core-rules에서 렌더)
-├─ hooks/                             # 7개 (v2: gate_on_commit·inject_core_rules·check_* 2개 폐기)
+├─ hooks/                             # 등록 5개 (v2: gate_on_commit·inject_core_rules·check_* 2개 폐기 / #31: 포인터 2개 폐기)
 │  ├─ guard_paths.py                  # #3 보호 경로 deny + 게이트 파일 ask(#19)
 │  ├─ guard_bash.py                   # #19 파국 명령 ask(rm -rf 홈/루트·force-push·게이트 우회)
 │  ├─ format_py.py                    # #1 자동 포맷
 │  ├─ inject_plan_pointer.py          # #19 진행 중 plan 수용 기준 재주입
-│  ├─ inject_reuse_pointer.py         # #9 재사용 카탈로그 포인터
-│  ├─ inject_convention_pointer.py    # #11 컨벤션 포인터
-│  └─ remind_evaluator.py             # #12→07-07 독립 평가자 리마인더(PostToolUse Bash, 커밋직후 1회 ≥30줄)
+│  ├─ remind_evaluator.py             # #12→07-07 독립 평가자 리마인더(PostToolUse Bash, 커밋직후 1회 ≥30줄)
+│  └─ (inject_reuse_pointer.py·inject_convention_pointer.py)  # #9·#11 → **#31 폐기**. repo에선 삭제됐고
+│                                     #   ~/.claude엔 deploy가 prune을 안 해 잔류하지만 **미등록 = 비활성**(무해)
 ├─ harness/
 │  ├─ gate_runner.py                  # #19 커밋 게이트 본체(.git/hooks/pre-commit이 실행)
 │  ├─ install_gate.py                 # #19 pre-commit 쉼 설치(멱등, 남의 훅 안 덮음)
@@ -446,7 +449,9 @@ LLM 평가자(서브에이전트)만 가능(결정론 셸 게이트는 브라우
 │  ├─ core-rules.README.md            # 규칙 작성 가이드
 │  ├─ evaluate.recipe.example         # 검증 레시피 템플릿(프로젝트로 복사)
 │  ├─ conventions.frontend.example    # #11 frontend 컨벤션 템플릿
-│  └─ project-map.example             # #13 프로젝트 지도 템플릿(고정 스키마)
+│  ├─ project-map.example             # #13 프로젝트 지도 템플릿(고정 스키마)
+│  └─ rules.catalog.example           # #31 `.claude/rules/harness-catalog.md` 템플릿(세션 시작 1회 로드,
+│                                     #   포인터 훅 2개를 대체 — 스킬 3개가 카탈로그와 함께 씀)
 ├─ agents/
 │  └─ wook-evaluator.md               # #5 독립 Evaluator 서브에이전트
 └─ skills/
@@ -483,8 +488,8 @@ my-claude-harness/                  # git repo (비밀 0, 단순 blacklist .giti
 ├─ CLAUDE.md                        # 이 repo 작업 시 컨벤션(build-log 갱신 등)
 ├─ docs/{claude-harness-design, build-log}.md
 ├─ claude/                          # ~/.claude 산출물의 source of truth
-│  ├─ hooks/{guard_paths, guard_bash, format_py, inject_plan_pointer, inject_reuse_pointer, inject_convention_pointer, remind_evaluator}.py
-│  ├─ harness/{gate_runner.py, install_gate.py, core-rules.md, core-rules.README.md, evaluate.recipe.example, conventions.frontend.example, project-map.example}
+│  ├─ hooks/{guard_paths, guard_bash, format_py, inject_plan_pointer, remind_evaluator}.py  # #31: 포인터 2개 삭제
+│  ├─ harness/{gate_runner.py, install_gate.py, core-rules.md, core-rules.README.md, evaluate.recipe.example, conventions.frontend.example, project-map.example, rules.catalog.example}
 │  ├─ agents/wook-evaluator.md       # #5 Evaluator 서브에이전트
 │  ├─ skills/{wook-evaluate, wook-plan, wook-brainstorm, wook-index, wook-conventions, wook-map, wook-onboard}/SKILL.md  # 진입점
 │  └─ settings.hooks.json           # 우리가 소유한 hooks 블록({HOOKS_DIR} placeholder)
