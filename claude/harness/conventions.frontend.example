@@ -2,7 +2,7 @@
 
 > `/wook-conventions frontend`가 만드는 `.claude/conventions/frontend.md`의 예시.
 > **규칙만** 적고 값은 실제 소스(토큰 파일)를 `path:symbol`로 가리킨다 → 값은 안 낡음.
-> `inject_convention_pointer` hook이 매 턴 "프론트 작업 전 이 문서 읽어라" 안내.
+> `.claude/rules/harness-catalog.md`가 세션 시작 시 1회 로드되어 "프론트 작업 전 이 문서 읽어라"를 알린다.
 
 ## 테마
 - 라이트/다크 둘 다 지원. 색은 토큰으로만 — **raw hex 직접 사용 금지**.  [강제: style]

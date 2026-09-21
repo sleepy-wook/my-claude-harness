@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""Behavioral tests for the convention system (pointer inject, stale warn, gate enforce).
+"""Behavioral tests for the convention system (stale-pointer warn, gate enforce).
 
-v2: stale-pointer detection moved from a Stop hook into the commit gate
+v2: stale-pointer detection moved from a Stop hook into the commit gate; the per-turn
+pointer-inject hook was retired in favour of `.claude/rules/harness-catalog.md` (#31), so
+only the gate-side behaviour is tested here
 (gate_runner.py, warning-only), and machine-checkable rules are enforced by the
 same gate at commit time. Self-contained throwaway projects. Exit 0 = all pass.
 """
 
-import json
 import shutil
 import subprocess
 import sys
@@ -21,7 +22,6 @@ except Exception:
 
 
 HOOKS = Path(__file__).resolve().parent.parent / "claude" / "hooks"
-INJECT = str(HOOKS / "inject_convention_pointer.py")
 GATE = str(HOOKS.parent / "harness" / "gate_runner.py")
 
 results = []
@@ -31,22 +31,6 @@ def check(name, got, want):
     ok = got == want
     results.append(ok)
     print(f"  [{'PASS' if ok else 'FAIL'}] {name}: got={got!r} want={want!r}")
-
-
-def run_hook(script, cwd, extra=None):
-    ev = {"cwd": cwd}
-    if extra:
-        ev.update(extra)
-    p = subprocess.run(
-        [sys.executable, "-B", script],
-        input=json.dumps(ev),
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        timeout=60,
-    )
-    return p.returncode, p.stdout.strip()
 
 
 def run_gate(cwd):
@@ -67,23 +51,6 @@ def conv_dir(d):
     c.mkdir(parents=True)
     return c
 
-
-print("Test 2 — pointer inject hook")
-d = tempfile.mkdtemp(prefix="conv_")
-c = conv_dir(d)
-(c / "frontend.md").write_text(
-    "# f\n- primary · x · src/theme.ts:primary\n", encoding="utf-8"
-)
-(c / "shared.md").write_text("# shared\n", encoding="utf-8")
-rc, out = run_hook(INJECT, d)
-check(
-    "2a present: exit 0 + mentions shared + frontend",
-    rc == 0 and "shared.md" in out and "frontend" in out and "additionalContext" in out,
-    True,
-)
-d2 = tempfile.mkdtemp(prefix="conv_")  # no conventions dir
-rc, out = run_hook(INJECT, d2)
-check("2b absent: exit 0 + no output", rc == 0 and out == "", True)
 
 print("Test 3 — stale pointers warned by the commit gate (never blocks)")
 d = tempfile.mkdtemp(prefix="conv_")

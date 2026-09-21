@@ -160,8 +160,9 @@ wook-evaluator + 커밋 게이트          실제 실행으로 검증
 | `evaluate.recipe` | 검증 체크(`name: 셸명령`, exit 0=통과) | wook-plan / onboard | 게이트 · wook-evaluate |
 | `plan.md` | 스펙(컨텍스트 생존용) | wook-plan | 사람 · AI |
 | `project-map.md` | 구조·스택·실행법(고정 스키마) | wook-map / onboard | wook-evaluator · 모든 작업 |
-| `conventions/<d>.md` | 도메인 코딩 규칙 | wook-conventions / onboard | `inject_convention_pointer` |
-| `reuse-index/<d>.md` | 재사용 카탈로그 | wook-index / onboard | `inject_reuse_pointer` |
+| `conventions/<d>.md` | 도메인 코딩 규칙 | wook-conventions / onboard | `rules/harness-catalog.md`(세션 1회 로드) |
+| `reuse-index/<d>.md` | 재사용 카탈로그 | wook-index / onboard | `rules/harness-catalog.md`(세션 1회 로드) |
+| `rules/harness-catalog.md` | 두 카탈로그의 위치·도메인 목록 | wook-conventions / index / onboard | Claude Code(세션 시작) |
 | `evaluate-off` | (빈 파일) 게이트 끄기 | 수동 | 게이트 |
 
 ---
@@ -173,8 +174,6 @@ hook은 생명주기 특정 시점에 **반드시** 실행되는 스크립트다
 | 이벤트 | 하는 일 | 스크립트 |
 |--------|---------|----------|
 | `UserPromptSubmit` | 진행 중 plan의 수용 기준 재주입(compaction 생존) | `inject_plan_pointer.py` |
-| `UserPromptSubmit` | 재사용 카탈로그 포인터 주입 | `inject_reuse_pointer.py` |
-| `UserPromptSubmit` | 컨벤션 포인터 주입 | `inject_convention_pointer.py` |
 | `PreToolUse` (Edit\|Write) | 보호 경로 deny(.git·키·시크릿) + 게이트 기준 파일 ask | `guard_paths.py` |
 | `PreToolUse` (Bash\|PowerShell) | 파국 명령 ask(rm -rf 홈/루트, force-push, reset --hard, 게이트 우회…) | `guard_bash.py` |
 | `PostToolUse` (Edit\|Write) | `.py` 자동 포맷(ruff) | `format_py.py` |
