@@ -5,55 +5,40 @@
 
 ---
 
-# SPEC — Claude-only 정렬 4/4: 마찰 제거 + #30 사고 근본원인 (#32, 승인: 2026-09-21)
+# SPEC — 감축: 안 쓰는 것 삭제 + Ratchet에 감산 규칙 (#33, 승인: 2026-09-21)
 
-3단계(측정 = `claude plugin eval`)는 **보류**(형욱 결정): CLI v2.1.269+ 필요 + 실행이 실제 모델
-호출이라 형욱 머신/과금 몫. 여기서는 컨테이너에서 완결 가능한 4단계만 한다.
+형욱: "불필요한 파일·스크립트가 많아지고 매번 오래 걸리는 게 싫다. 정리를 안 해서 복잡해진다."
+측정해보니 맞는 지적이었다 — **자기검증 1,848줄 : 런타임 1,340줄 = 1.38배**, 참조 0인 파일 2개,
+고아 스킬 1개. 그리고 근본 원인: **Ratchet 원칙에 감산이 없다**(추가만 있고 제거 규칙이 없음).
 
 ## Scope — IN
-1. **`test_gate_runner.py`·`test_evaluator.py`가 `GIT_*`를 스크럽** — #30 사고의 진짜 원인.
-   훅 환경에서 돌면 git이 `GIT_DIR`/`GIT_INDEX_FILE`을 export하는데, 테스트의 `git init`·게이트
-   실행이 그걸 상속해 **임시 repo가 아니라 실제 repo를 조작**했다(→ `core.bare=true`, `[user] t@t`
-   주입, 세션 stop-hook 파손). `clean_env()` 헬퍼로 `GIT_`로 시작하는 키를 전부 제거.
-   **회귀 테스트 동반**: `GIT_DIR`을 심어둔 채 `repo()`가 여전히 자기 임시 repo를 만드는지 단언.
-2. **`install_gate.py` → `--git-common-dir`** — linked worktree에서 `--git-dir`은
-   `.git/worktrees/<n>`을 주고 git은 **그 위치의 훅을 실행하지 않는다**(평가자가 실증: 설치는
-   성공했는데 발동한 건 메인 클론의 기존 훅이었음). 구 git 대비 `--git-dir` 폴백 유지.
-3. **`SessionStart` 훅 `arm_gate.py` 신설** — recipe가 있는데 게이트가 없으면 자동 설치.
-   관측된 실패: 이 컨테이너 클론에 `.claude/evaluate.recipe`가 **커밋돼 있는데도** 게이트가 없어
-   초반 커밋들이 무검증으로 지나갔다(내가 수동 설치). "recipe 존재 = 게이트 ON" 원칙의 구멍.
-   이미 우리 훅이면 **침묵**, 남의 pre-commit이면 install_gate가 거부(덮어쓰지 않음).
-4. **`/wook-plan` 6단계에 `/goal` 한 줄** — 장기 작업이면 네이티브 `/goal <수용 기준>` 제안.
-   게이트=커밋 시 결정론, `/goal`=매 턴 별도 소형 모델이 조건 판정·진전 없으면 정지. 보완 관계.
+1. **삭제**(형욱 확인): `wook-audit` 스킬(90줄, 다른 문서에서 2번만 언급된 고아) ·
+   `core-rules.README.md`(30줄, 참조 0) · `conventions.frontend.example`(30줄, 참조 0)
+2. **레시피에서 `deploy --check` 제거** — `~/.claude`가 repo와 동기인지는 **머신 상태**지
+   커밋의 속성이 아니다. 이번 세션 **정상 커밋 2번 차단 / 진짜 결함 0건**. 대체물 없음(드리프트는
+   `python deploy.py` 한 번으로 해소). 게이트 3줄 → 2줄
+3. **core-rules 개정(줄 수 순증 최소, 기존 줄을 고쳐 씀)**:
+   - 평가자 = **3단 계층**: 안전장치(훅·게이트·가드·deploy) 변경=항상 / 테스트가 못 잡는 체감
+     동작=보통 / 문서·기계적 리팩터=생략. 회당 7~12분이므로 범위를 좁게 준다
+   - **감산 규칙 신설**: 코드를 지우면 그 가드·테스트도 같은 커밋에서 지운다. 새 파일은
+     "무엇을 대체하나 / 왜 기존 걸로 안 되나"에 답할 수 있을 때만 만든다
+4. README 정합화(wook-audit 행 제거, 게이트 설치가 이제 자동임을 반영 — #32 후속 누락분)
 
 ## Scope — OUT
-- **junction/symlink 배포(원래 4-b) ✗** — 스킬 호출명이 `/wook:plan`류로 바뀌고 Windows 동작을
-  여기서 검증 불가. drift는 `python deploy.py` 한 번으로 해소되는 문제라 이득 < 위험.
-- `wook-evaluator`에 `maxTurns` ✗ — 관측된 실패 없음(Ratchet).
-- deploy의 stale 파일 prune ✗ (삭제 로직 위험, 미등록 파일은 무해).
-- 3단계(plugin eval / skill-doctor) ✗ — 보류.
-- `guard_paths`/`guard_bash`/`permissions` ✗ — #31에서 확정한 대로 불변.
+- `wook-sandbox`·`wook-brainstorm` 삭제 ✗(형욱: 유지) · `test_promax_tokens.py` 축소 ✗(형욱: pro-max 계속 사용 → 유지)
+- 새 가드/스크립트 추가 ✗ — "스크립트가 늘어서 싫다"는데 감시 스크립트를 더하면 자기모순. 규칙으로만
+- `tools/` 테스트 축소 ✗ — 테스트는 런타임의 그림자다. 줄이려면 런타임을 줄여야 하고, 지금 런타임에
+  덜어낼 곳이 없다(훅 6개 전부 관측된 실패에서 나옴). 별건
 
 ## Edge cases
-- `arm_gate`는 **어떤 경우에도 세션을 막지 않는다**: 예외·git 없음·repo 아님 → 조용히 exit 0
-- recipe 없는 프로젝트에선 완전 무출력(파일 존재 = ON 패턴)
-- 남의 pre-commit 존재 → install_gate가 거부 메시지 반환 → 훅은 그 사유를 1회 알리고 exit 0
-- `--git-common-dir`는 상대 경로(`.git`)를 줄 수 있음 → cwd 기준 resolve
-- 새 훅은 `selfcheck`의 "등록된 훅 스크립트 실재" 검사 대상 → 등록·파일 동시 추가
-- 새 테스트 파일은 인코딩 가드 대상 → `sys.stdout.reconfigure` 동반
+- 레시피 편집 = `guard_paths` ask + 게이트 자기보호 → 커밋에 `GATE_EDIT_OK=1` 필요(= 사람 승인)
+- 스킬 삭제로 `selfcheck`의 md frontmatter 개수가 11→10 (정상)
+- 삭제 파일이 `~/.claude`엔 잔류(deploy는 prune 안 함) — 미등록/미참조라 무해
 
 ## 수용 기준 (Acceptance criteria)
-recipe 불변(`selfcheck`/`tests`/`deploy --check` 전부 exit 0). 나머지는 테스트/원샷 명령:
-- `python -B tools/run_tests.py` → **11/11** 파일 PASS (신규 `test_arm_gate.py` 포함)
-- `test_gate_runner.py`: `GIT_DIR`을 환경에 심은 채 `repo()`가 **자기 임시 repo**를 만든다(`<tmp>/.git` 존재)
-- **스크럽이 한 파일에 반만 적용되는 걸 기계가 잡는다**(1차 평가 FAIL의 교훈 — 기준이 `test_gate_runner`만
-  점검해 반쪽 수정이 통과했다): `selfcheck`의 `git-env` 가드가 `tools/test_*.py`에서 `env=` 없는 git
-  spawn을 전부 적발. 검증법 = 아무 테스트의 `env=e`를 하나 지우면 `selfcheck`가 exit 1
-- `env GIT_DIR=/tmp/bogus python -B tools/test_evaluator.py` → exit 0 이고 `/tmp/bogus`가 **생성되지 않음**
-- `test_arm_gate.py`에 **실제 git 훅 환경 end-to-end**(실제 `git commit`으로 실패 recipe→차단, 통과 recipe→커밋)
-- `grep -c 'git-common-dir' claude/harness/install_gate.py` ≥ 1
-- `test_arm_gate.py`: ① recipe 있고 훅 없음 → 설치되고 `.git/hooks/pre-commit`에 마커 존재
-  ② 이미 우리 훅 → 무출력(침묵) ③ recipe 없음 → 무출력 ④ 남의 훅 → 덮어쓰지 않음(내용 보존)
-- `settings.hooks.json`에 `SessionStart` 등록 1개(`arm_gate.py`), 기존 4 이벤트 불변
-- `grep -c '/goal' claude/skills/wook-plan/SKILL.md` ≥ 1
-- 독립 평가자 PASS — **실거래는 worktree 금지, scratchpad `git clone` 사본에서**(#30 재발 방지)
+- `python tools/selfcheck.py` exit 0 (md 10개) · `python -B tools/run_tests.py` **11/11** exit 0
+- `git grep -l 'wook-audit\|core-rules.README\|conventions.frontend.example' -- ':!docs/' ':!.claude/plan.md'` → 출력 없음
+- `.claude/evaluate.recipe`의 실행 줄 = **2개**(`selfcheck`, `tests`), 게이트 여전히 exit 0
+- `core-rules.md`에 평가자 3단 계층 + 감산 규칙이 있고, 전체 길이는 17줄 이하 유지(상시 로드 비용)
+- **독립 평가자 생략** — 이 변경 자체가 새 3단 계층의 첫 적용 사례다(삭제 + 문서 정합화, 스위트가
+  전부 덮음). 대신 위 명령들을 실제 실행한 출력으로 대체한다

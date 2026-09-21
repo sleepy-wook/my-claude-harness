@@ -3,4 +3,6 @@
 # /wook-evaluate도 같은 기준을 쓴다. 비활성화: .claude/evaluate-off 생성. 우회: --no-verify.
 selfcheck: python tools/selfcheck.py
 tests:     python -B tools/run_tests.py
-deploy:    python deploy.py --check
+# `deploy --check`는 2026-09-21에 제거했다: ~/.claude가 repo와 동기인지는 **머신 상태**지
+# 커밋의 속성이 아니다. 실제로 정상 커밋을 두 번 막았고 진짜 결함은 0건 잡았다.
+# 드리프트는 `python deploy.py` 한 번으로 해소된다.

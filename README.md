@@ -41,8 +41,8 @@ cd my-claude-harness
 python deploy.py          # claude/ → ~/.claude 배포 + settings.json hooks 병합 + CLAUDE.md 렌더 (멱등)
 ```
 - 미리 보기: `python deploy.py --check`. 배포되는 것: `hooks/`·`harness/`·`agents/`·`skills/` + `CLAUDE.md`(상시 규칙).
-- 프로젝트에서 recipe를 쓰기 시작하면 `python ~/.claude/harness/install_gate.py`로 그 repo에 커밋 게이트 설치
-  (`/wook-plan`·`/wook-onboard`가 recipe 쓸 때 같이 해준다).
+- 커밋 게이트는 **자동으로 설치된다** — `.claude/evaluate.recipe`가 있는 repo에서 세션을 열면
+  `arm_gate` 훅이 `.git/hooks/pre-commit`을 깐다(이미 우리 것이면 침묵, 남의 훅은 안 덮음).
 - **Claude Code 재시작** — 스킬/에이전트는 세션 시작 시 로드(첫 배포 후 1회). hook은 재시작 없이 곧 반영.
 - 새 PC 복원: `clone → deploy → 재시작` 반복.
 
@@ -59,12 +59,11 @@ python deploy.py          # claude/ → ~/.claude 배포 + settings.json hooks �
 | [`/wook-map`](#wook-map) | 프로젝트 지도(구조·스택·실행법) | 지식 |
 | [`/wook-conventions`](#wook-conventions) | 도메인 코딩 컨벤션 | 지식 |
 | [`/wook-index`](#wook-index) | 재사용 카탈로그 | 지식 |
-| `/wook-audit` | 전체 트리 상시 감사 원장(`.claude/audit/`) | 지식 |
 | `/wook-sandbox` | 격리 제작 → 써보고 → 졸업(실제 경로로 이동) | 제작 |
 | `/wook-palette` | pro-max 토큰의 **AA 관문** — 걔네 16역할을 CSV서 회수 → 대비 계산 → tokens.css | 디자인 |
 
 > 트리거는 직접 타이핑(`/wook-plan`)하거나, 설명에 맞는 상황이면 Claude가 알아서 제안한다.
-> (`/wook-audit`·`/wook-sandbox`·`/wook-palette`는 상세 절 없이 스킬 본문이 안내 — SKILL.md 참조.)
+> (`/wook-sandbox`·`/wook-palette`는 상세 절 없이 스킬 본문이 안내 — SKILL.md 참조.)
 
 ### 디자인 흐름 — **하네스가 pro-max에 맞춘다** (2026-07-17~)
 
@@ -179,8 +178,8 @@ hook은 생명주기 특정 시점에 **반드시** 실행되는 스크립트다
 | `PostToolUse` (Edit\|Write) | `.py` 자동 포맷(ruff) | `format_py.py` |
 | `PostToolUse` (Bash) | 커밋 직후 1회, 큰 커밋(≥30줄)일 때만 "독립 평가자 돌려" 리마인더 | `remind_evaluator.py` |
 
-**커밋 게이트는 hook이 아니라 git 자체에 산다** — `.git/hooks/pre-commit`(설치:
-`python ~/.claude/harness/install_gate.py`)이 `gate_runner.py`를 실행해 recipe를 검증한다.
+**커밋 게이트는 hook이 아니라 git 자체에 산다** — `.git/hooks/pre-commit`(세션 시작 시 `arm_gate`가
+자동 설치)이 `gate_runner.py`를 실행해 recipe를 검증한다.
 어느 에이전트든, 사람이 터미널에서 커밋해도 동일하게 걸리고, `--no-verify`가 네이티브 우회다.
 게이트는 ① recipe 실행(미통과면 커밋 차단) ② **자기보호**(staged에 recipe 변경/테스트 삭제가
 섞이면 `GATE_EDIT_OK=1` 없이는 차단 — 기준 약화는 사람이 승인) ③ **stall 감지**(같은 실패
@@ -227,7 +226,7 @@ my-claude-harness/
 │  └─ harness-overview.svg         # 위 구조 다이어그램
 ├─ claude/                         # ~/.claude 로 배포되는 원본 (비밀 0)
 │  ├─ hooks/                       # 7개 hook 스크립트 (guard·inject·format·remind)
-│  ├─ harness/                     # core-rules + gate_runner/install_gate + 템플릿
+│  ├─ harness/                     # core-rules + gate_runner/install_gate + 템플릿 3종
 │  ├─ agents/wook-evaluator.md     # 독립 Evaluator 서브에이전트
 │  └─ skills/{wook-plan, wook-brainstorm, wook-evaluate,
 │             wook-onboard, wook-map, wook-conventions, wook-index}/SKILL.md
