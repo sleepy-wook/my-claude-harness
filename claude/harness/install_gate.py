@@ -2,7 +2,7 @@
 """Install the wook commit gate as `.git/hooks/pre-commit` in the current repo.
 
 The gate itself is `gate_runner.py` (deployed to ~/.claude/harness/ — canonical on
-this machine even for other agents; ~/.codex is a fallback). This installer writes a
+this machine). This installer writes a
 tiny sh shim so the gate is git-native: it fires for every committer (any agent or
 human), `--no-verify` bypasses it natively, and no agent-side hook has to parse Bash
 commands. `/wook-plan` and `/wook-onboard` run this right after writing a recipe.
@@ -24,7 +24,6 @@ SHIM = f"""#!/bin/sh
 # {MARKER} (installed by install_gate.py) — runs .claude/evaluate.recipe on commit.
 # Bypass: git commit --no-verify   |   Disable: create .claude/evaluate-off
 GATE="$HOME/.claude/harness/gate_runner.py"
-[ -f "$GATE" ] || GATE="$HOME/.codex/harness/gate_runner.py"
 [ -f "$GATE" ] || exit 0   # harness not deployed on this machine -> never trap
 exec python "$GATE"
 """
