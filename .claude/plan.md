@@ -46,6 +46,11 @@
 recipe 불변(`selfcheck`/`tests`/`deploy --check` 전부 exit 0). 나머지는 테스트/원샷 명령:
 - `python -B tools/run_tests.py` → **11/11** 파일 PASS (신규 `test_arm_gate.py` 포함)
 - `test_gate_runner.py`: `GIT_DIR`을 환경에 심은 채 `repo()`가 **자기 임시 repo**를 만든다(`<tmp>/.git` 존재)
+- **스크럽이 한 파일에 반만 적용되는 걸 기계가 잡는다**(1차 평가 FAIL의 교훈 — 기준이 `test_gate_runner`만
+  점검해 반쪽 수정이 통과했다): `selfcheck`의 `git-env` 가드가 `tools/test_*.py`에서 `env=` 없는 git
+  spawn을 전부 적발. 검증법 = 아무 테스트의 `env=e`를 하나 지우면 `selfcheck`가 exit 1
+- `env GIT_DIR=/tmp/bogus python -B tools/test_evaluator.py` → exit 0 이고 `/tmp/bogus`가 **생성되지 않음**
+- `test_arm_gate.py`에 **실제 git 훅 환경 end-to-end**(실제 `git commit`으로 실패 recipe→차단, 통과 recipe→커밋)
 - `grep -c 'git-common-dir' claude/harness/install_gate.py` ≥ 1
 - `test_arm_gate.py`: ① recipe 있고 훅 없음 → 설치되고 `.git/hooks/pre-commit`에 마커 존재
   ② 이미 우리 훅 → 무출력(침묵) ③ recipe 없음 → 무출력 ④ 남의 훅 → 덮어쓰지 않음(내용 보존)

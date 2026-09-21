@@ -221,10 +221,47 @@ def _prints_nonascii_unguarded(src: str) -> bool:
 # escape hatch: it must be this exact phrase, and it is used by exactly one file.
 FIXTURE_MARKER = "selfcheck-exempt: bad-code fixtures, not real call sites"
 
+
+def _git_call_inherits_env(src: str) -> bool:
+    """True if a TEST file spawns git (or a hook that shells out to git) without env=.
+
+    Tests build throwaway repos, but git exports GIT_DIR / GIT_INDEX_FILE / GIT_WORK_TREE
+    to anything a hook runs. A subprocess that inherits them silently retargets the REAL
+    repository: on 2026-09-21 (#30) this suite, run from a pre-commit hook in a linked
+    worktree, rewrote the harness repo's index and flipped core.bare. The fix is to pass a
+    GIT_*-scrubbed env — and this guard exists because the FIRST fix was applied to only
+    one of two files, and an evaluator reproduced real cross-repo damage from the other
+    (#32). Same lesson as the encoding guard: a rule nobody checks decays to a comment.
+
+    Only test files are scanned: hooks and the gate itself run inside the real repo on
+    purpose and must keep git's ambient environment.
+    """
+    src = _strip_prose(src)
+    for m in re.finditer(r"\b\w+\.(?:run|check_output|Popen)\(", src):
+        depth, j = 1, m.end()
+        while j < len(src) and depth:
+            depth += {"(": 1, ")": -1}.get(src[j], 0)
+            j += 1
+        body = src[m.end() : j]
+        # Literal git spawns only. Guessing by variable name (REMIND/HOOK/GP…) flagged
+        # test_guard_bash and test_guard_paths, which never touch git — and a guard that
+        # cries wolf gets ignored, which is how the real one slips through.
+        spawns_git = re.search(r"""["']git[\s"']""", body)
+        if spawns_git and not re.search(r"\benv\s*=", body):
+            return True
+    return False
+
+
 for s in scripts:
     src = Path(s).read_text(encoding="utf-8")
     if FIXTURE_MARKER in src:
         continue
+    if os.path.basename(s).startswith("test_") and _git_call_inherits_env(src):
+        errors.append(
+            f"git-env: {os.path.relpath(s, REPO)} — spawns git (or a git-using hook) "
+            "without env=; inherited GIT_DIR/GIT_INDEX_FILE make throwaway-repo tests "
+            "operate on the REAL repo (#30/#32). Pass a GIT_*-scrubbed env."
+        )
     kind = _io_missing_encoding(src)
     if kind:
         errors.append(

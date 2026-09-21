@@ -147,6 +147,7 @@ state = Path(
         text=True,
         encoding="utf-8",
         errors="replace",
+        env=clean_env(),
     ).stdout.strip()
 )
 state = (d / state if not state.is_absolute() else state) / "wook-gate-state.json"

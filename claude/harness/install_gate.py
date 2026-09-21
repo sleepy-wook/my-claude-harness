@@ -25,7 +25,13 @@ SHIM = f"""#!/bin/sh
 # Bypass: git commit --no-verify   |   Disable: create .claude/evaluate-off
 GATE="$HOME/.claude/harness/gate_runner.py"
 [ -f "$GATE" ] || exit 0   # harness not deployed on this machine -> never trap
-exec python "$GATE"
+# Pick an interpreter that exists. A bare `python` is absent on many Linux installs
+# (Debian/Ubuntu without python-is-python3); without this the shim exits non-zero and
+# blocks EVERY commit in the repo. Missing interpreter = no gate, never a trap.
+for PY in python python3; do
+  command -v "$PY" >/dev/null 2>&1 && exec "$PY" "$GATE"
+done
+exit 0
 """
 
 

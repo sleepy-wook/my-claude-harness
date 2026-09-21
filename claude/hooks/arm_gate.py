@@ -53,12 +53,36 @@ def hooks_dir(root: Path) -> Path | None:
             text=True,
             encoding="utf-8",
             errors="replace",
-            timeout=15,
+            timeout=5,
         )
         if out.returncode == 0 and out.stdout.strip():
             p = Path(out.stdout.strip())
             return (root / p if not p.is_absolute() else p).resolve() / "hooks"
     return None
+
+
+def recipe_summary(root: Path, limit: int = 8) -> str:
+    """The checks being armed, verbatim.
+
+    A recipe is shell the repository authored; arming it without showing it would hide
+    what is about to run on the developer's machine. `name: command` lines only.
+    """
+    try:
+        lines = (
+            (root / ".claude" / "evaluate.recipe")
+            .read_text(encoding="utf-8", errors="replace")
+            .splitlines()
+        )
+    except Exception:
+        return ""
+    checks = [
+        ln.strip() for ln in lines if ln.strip() and not ln.lstrip().startswith("#")
+    ]
+    if not checks:
+        return ""
+    shown = "\n".join(f"  - {c}" for c in checks[:limit])
+    more = f"\n  … 외 {len(checks) - limit}개" if len(checks) > limit else ""
+    return f"실행될 체크:\n{shown}{more}"
 
 
 def emit(message: str) -> None:
@@ -88,6 +112,8 @@ def main() -> int:
         hd = hooks_dir(root)
         if hd is None:
             return 0  # not a git repo
+        if (root / ".claude" / "evaluate-off").exists():
+            return 0  # gate explicitly disabled here -> don't arm it behind their back
         hook = hd / "pre-commit"
         if hook.is_file() and MARKER in hook.read_text(
             encoding="utf-8", errors="replace"
@@ -102,14 +128,15 @@ def main() -> int:
             text=True,
             encoding="utf-8",
             errors="replace",
-            timeout=30,
+            timeout=15,
         )
         detail = (out.stdout + out.stderr).strip()
         if out.returncode == 0:
             emit(
-                "커밋 게이트를 설치했습니다 — 이 repo의 `.claude/evaluate.recipe`가 "
-                "이제 매 `git commit`에서 실행됩니다 (우회: `--no-verify`, 끄기: "
-                "`.claude/evaluate-off`)."
+                "커밋 게이트를 설치했습니다 — 이 repo가 커밋한 "
+                "`.claude/evaluate.recipe`가 이제 매 `git commit`에서 실행됩니다.\n"
+                f"{recipe_summary(root)}\n"
+                "(우회: `git commit --no-verify`, 끄기: `.claude/evaluate-off` 생성)"
             )
         elif detail:
             emit(f"커밋 게이트를 설치하지 못했습니다:\n{detail}")

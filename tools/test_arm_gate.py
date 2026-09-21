@@ -130,6 +130,65 @@ p = subprocess.run(
 check("G exit 0", p.returncode, 0)
 check("G no output", p.stdout.strip(), "")
 
+print("Test H — evaluate-off present -> don't arm it behind their back")
+d = repo()
+(d / ".claude" / "evaluate-off").write_text("", encoding="utf-8")
+rc, out = run_hook(d)
+check("H exit 0", rc, 0)
+check("H no hook installed", pre_commit(d).exists(), False)
+
+print("Test I — the notice says WHAT was armed (repo-authored shell, shown not hidden)")
+d = repo()
+(d / ".claude" / "evaluate.recipe").write_text(
+    "# comment line\ntests: pytest -q\nlint: ruff check .\n", encoding="utf-8"
+)
+rc, out = run_hook(d)
+msg = json.loads(out)["hookSpecificOutput"]["systemMessage"]
+check(
+    "I lists each check",
+    "tests: pytest -q" in msg and "lint: ruff check ." in msg,
+    True,
+)
+check("I omits comment lines", "# comment line" not in msg, True)
+check(
+    "I names the escape hatches", "--no-verify" in msg and "evaluate-off" in msg, True
+)
+
+print("Test J — end-to-end through a REAL git hook environment")
+# The suites scrub GIT_* so throwaway repos stay isolated (#30). That means nothing else
+# exercises the environment production actually runs in — git exports GIT_INDEX_FILE,
+# GIT_PREFIX, GIT_AUTHOR_* to the hook. This test commits for real, so the gate is invoked
+# by git itself with all of that present.
+d = repo()
+(d / ".claude" / "evaluate.recipe").write_text("boom: false\n", encoding="utf-8")
+run_hook(d)  # arm it
+(d / "a.txt").write_text("hi\n", encoding="utf-8")
+e = clean_env()
+subprocess.run(["git", "add", "-A"], cwd=d, check=True, env=e)
+p = subprocess.run(
+    ["git", "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-m", "x"],
+    cwd=d,
+    capture_output=True,
+    text=True,
+    encoding="utf-8",
+    errors="replace",
+    env=e,
+)
+check("J failing recipe blocks a real commit", p.returncode != 0, True)
+check("J names the failing check", "boom" in (p.stdout + p.stderr), True)
+(d / ".claude" / "evaluate.recipe").write_text("ok: true\n", encoding="utf-8")
+subprocess.run(["git", "add", "-A"], cwd=d, check=True, env=e)
+p = subprocess.run(
+    ["git", "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-m", "x"],
+    cwd=d,
+    capture_output=True,
+    text=True,
+    encoding="utf-8",
+    errors="replace",
+    env=e,
+)
+check("J passing recipe allows it", p.returncode, 0)
+
 for p_ in Path(tempfile.gettempdir()).glob("armgate_*"):
     shutil.rmtree(p_, ignore_errors=True)
 
