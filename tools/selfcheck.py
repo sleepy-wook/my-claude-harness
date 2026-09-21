@@ -222,8 +222,22 @@ def _prints_nonascii_unguarded(src: str) -> bool:
 FIXTURE_MARKER = "selfcheck-exempt: bad-code fixtures, not real call sites"
 
 
+def _harness_script_consts(src: str) -> set:
+    """Module-level constants that hold a path into claude/hooks or claude/harness.
+
+    Derived from the file's own source, not a guessed name list. That distinction is the
+    whole point: the first version of this guard matched names like REMIND/HOOK/GP and
+    flagged test_guard_bash and test_guard_paths, which never touch git.
+    """
+    names = set()
+    for m in re.finditer(r"(?m)^([A-Z_][A-Z0-9_]*)\s*=\s*(.+?)(?=\n[^\s)\]}]|\Z)", src):
+        if re.search(r'"(?:hooks|harness)"|/(?:hooks|harness)/', m.group(2)):
+            names.add(m.group(1))
+    return names
+
+
 def _git_call_inherits_env(src: str) -> bool:
-    """True if a TEST file spawns git (or a hook that shells out to git) without env=.
+    """True if a TEST file spawns git, or one of our hooks, without env=.
 
     Tests build throwaway repos, but git exports GIT_DIR / GIT_INDEX_FILE / GIT_WORK_TREE
     to anything a hook runs. A subprocess that inherits them silently retargets the REAL
@@ -233,20 +247,26 @@ def _git_call_inherits_env(src: str) -> bool:
     one of two files, and an evaluator reproduced real cross-repo damage from the other
     (#32). Same lesson as the encoding guard: a rule nobody checks decays to a comment.
 
-    Only test files are scanned: hooks and the gate itself run inside the real repo on
-    purpose and must keep git's ambient environment.
+    Two call shapes count, and the second was added because the guard's own docstring once
+    claimed it without the code doing it (an evaluator deleted `env=` from a hook-spawning
+    call and this returned clean):
+      1. a literal `git …` command
+      2. one of OUR hook/harness scripts — several shell out to git themselves, so an
+         inherited GIT_DIR points them at the wrong repository
+    Only test files are scanned: hooks and the gate run inside the real repo on purpose and
+    must keep git's ambient environment.
     """
     src = _strip_prose(src)
+    scripts_here = _harness_script_consts(src)
     for m in re.finditer(r"\b\w+\.(?:run|check_output|Popen)\(", src):
         depth, j = 1, m.end()
         while j < len(src) and depth:
             depth += {"(": 1, ")": -1}.get(src[j], 0)
             j += 1
         body = src[m.end() : j]
-        # Literal git spawns only. Guessing by variable name (REMIND/HOOK/GP…) flagged
-        # test_guard_bash and test_guard_paths, which never touch git — and a guard that
-        # cries wolf gets ignored, which is how the real one slips through.
-        spawns_git = re.search(r"""["']git[\s"']""", body)
+        spawns_git = re.search(r"""["']git[\s"']""", body) or any(
+            re.search(rf"\b{re.escape(n)}\b", body) for n in scripts_here
+        )
         if spawns_git and not re.search(r"\benv\s*=", body):
             return True
     return False
@@ -254,14 +274,17 @@ def _git_call_inherits_env(src: str) -> bool:
 
 for s in scripts:
     src = Path(s).read_text(encoding="utf-8")
-    if FIXTURE_MARKER in src:
-        continue
+    # The git-env check runs even in the fixture-exempt file: FIXTURE_MARKER exempts
+    # *bad-code string fixtures* from the ENCODING scans, and letting it silence an
+    # unrelated guard would turn one narrow opt-out into a general escape hatch (#32).
     if os.path.basename(s).startswith("test_") and _git_call_inherits_env(src):
         errors.append(
-            f"git-env: {os.path.relpath(s, REPO)} — spawns git (or a git-using hook) "
+            f"git-env: {os.path.relpath(s, REPO)} — spawns git (or one of our hooks) "
             "without env=; inherited GIT_DIR/GIT_INDEX_FILE make throwaway-repo tests "
             "operate on the REAL repo (#30/#32). Pass a GIT_*-scrubbed env."
         )
+    if FIXTURE_MARKER in src:
+        continue
     kind = _io_missing_encoding(src)
     if kind:
         errors.append(

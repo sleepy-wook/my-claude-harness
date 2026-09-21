@@ -153,6 +153,32 @@ check("I omits comment lines", "# comment line" not in msg, True)
 check(
     "I names the escape hatches", "--no-verify" in msg and "evaluate-off" in msg, True
 )
+check(
+    "I labels the repo text as data, not instructions",
+    "<recipe-checks>" in msg and "데이터" in msg,
+    True,
+)
+
+print("Test K — the shim only execs an interpreter that actually works")
+# An evaluator put a stub `python` that exits 1 first on PATH: the old shim exec'd it and,
+# with a fail-closed gate, blocked every commit — the very class the fallback was added for.
+d = repo()
+run_hook(d)
+shim = pre_commit(d).read_text(encoding="utf-8")
+check("K probes before exec", "sys.version_info" in shim, True)
+stub = Path(tempfile.mkdtemp(prefix="armgate_stub_"))
+(stub / "python").write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+(stub / "python").chmod(0o755)
+p_ = subprocess.run(
+    ["/bin/sh", str(pre_commit(d))],
+    cwd=d,
+    capture_output=True,
+    text=True,
+    encoding="utf-8",
+    errors="replace",
+    env=clean_env(PATH=str(stub)),
+)
+check("K broken python -> exit 0, never traps commits", p_.returncode, 0)
 
 print("Test J — end-to-end through a REAL git hook environment")
 # The suites scrub GIT_* so throwaway repos stay isolated (#30). That means nothing else
@@ -189,8 +215,9 @@ p = subprocess.run(
 )
 check("J passing recipe allows it", p.returncode, 0)
 
-for p_ in Path(tempfile.gettempdir()).glob("armgate_*"):
-    shutil.rmtree(p_, ignore_errors=True)
+for pat in ("armgate_*", "armgate_stub_*"):
+    for p_ in Path(tempfile.gettempdir()).glob(pat):
+        shutil.rmtree(p_, ignore_errors=True)
 
 print(f"\nRESULT: {sum(results)}/{len(results)} passed")
 sys.exit(0 if all(results) else 1)
