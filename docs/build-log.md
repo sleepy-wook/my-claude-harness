@@ -252,6 +252,7 @@
 - **파일:**
   - `~/.claude/hooks/inject_reuse_pointer.py` — UserPromptSubmit(2번째 핸들러). `.claude/reuse-index/`
     있으면 매 턴 **도메인 목록 포인터만** 주입(본문 아님), 없으면 무출력. "파일 존재=ON" 패턴.
+    → **폐기**(2026-09-21 #31): 운반체가 `.claude/rules/harness-catalog.md`(세션 시작 1회 로드)로 이전.
   - `~/.claude/skills/wook-index/SKILL.md` — `/wook-index`: 코드 훑어 도메인별 매니페스트 생성/갱신(semi-auto).
 - **동작:** (매 턴) 포인터로 도메인 인지 → AI가 작업 도메인 매니페스트 1개만 Read → 실제 소스 Read → 재사용.
 - **검증(실제 실행):** 멀티도메인 샘플로 — 포인터 hook(있으면 도메인 주입/없으면 무출력) ✓,
@@ -279,6 +280,7 @@
 - **파일:**
   - `~/.claude/hooks/inject_convention_pointer.py` — UserPromptSubmit(3번째). conventions 있으면
     매 턴 "shared 항상 + 도메인별 읽어라" 포인터만 주입, 없으면 무출력. (reuse 포인터의 형제)
+    → **폐기**(2026-09-21 #31): 운반체가 `.claude/rules/harness-catalog.md`(세션 시작 1회 로드)로 이전.
   - `~/.claude/hooks/check_convention_pointers.py` — Stop(비차단, 형제). 코드 변경 시 컨벤션
     포인터(`path:symbol`) 해석 검사 → 스테일이면 "갱신/`/wook-conventions`" **알림만**.
   - `~/.claude/skills/wook-conventions/SKILL.md` — `/wook-conventions` **bimodal**: greenfield=질문하며
@@ -432,14 +434,14 @@ LLM 평가자(서브에이전트)만 가능(결정론 셸 게이트는 브라우
 ~/.claude/
 ├─ settings.json                     # hooks 등록(PreToolUse, PostToolUse, UserPromptSubmit) — Stop 없음
 ├─ CLAUDE.md                          # #19 상시 규칙(marked block, deploy가 core-rules에서 렌더)
-├─ hooks/                             # 7개 (v2: gate_on_commit·inject_core_rules·check_* 2개 폐기)
+├─ hooks/                             # 등록 5개 (v2: gate_on_commit·inject_core_rules·check_* 2개 폐기 / #31: 포인터 2개 폐기)
 │  ├─ guard_paths.py                  # #3 보호 경로 deny + 게이트 파일 ask(#19)
 │  ├─ guard_bash.py                   # #19 파국 명령 ask(rm -rf 홈/루트·force-push·게이트 우회)
 │  ├─ format_py.py                    # #1 자동 포맷
 │  ├─ inject_plan_pointer.py          # #19 진행 중 plan 수용 기준 재주입
-│  ├─ inject_reuse_pointer.py         # #9 재사용 카탈로그 포인터
-│  ├─ inject_convention_pointer.py    # #11 컨벤션 포인터
-│  └─ remind_evaluator.py             # #12→07-07 독립 평가자 리마인더(PostToolUse Bash, 커밋직후 1회 ≥30줄)
+│  ├─ remind_evaluator.py             # #12→07-07 독립 평가자 리마인더(PostToolUse Bash, 커밋직후 1회 ≥30줄)
+│  └─ (inject_reuse_pointer.py·inject_convention_pointer.py)  # #9·#11 → **#31 폐기**. repo에선 삭제됐고
+│                                     #   ~/.claude엔 deploy가 prune을 안 해 잔류하지만 **미등록 = 비활성**(무해)
 ├─ harness/
 │  ├─ gate_runner.py                  # #19 커밋 게이트 본체(.git/hooks/pre-commit이 실행)
 │  ├─ install_gate.py                 # #19 pre-commit 쉼 설치(멱등, 남의 훅 안 덮음)
@@ -447,7 +449,9 @@ LLM 평가자(서브에이전트)만 가능(결정론 셸 게이트는 브라우
 │  ├─ core-rules.README.md            # 규칙 작성 가이드
 │  ├─ evaluate.recipe.example         # 검증 레시피 템플릿(프로젝트로 복사)
 │  ├─ conventions.frontend.example    # #11 frontend 컨벤션 템플릿
-│  └─ project-map.example             # #13 프로젝트 지도 템플릿(고정 스키마)
+│  ├─ project-map.example             # #13 프로젝트 지도 템플릿(고정 스키마)
+│  └─ rules.catalog.example           # #31 `.claude/rules/harness-catalog.md` 템플릿(세션 시작 1회 로드,
+│                                     #   포인터 훅 2개를 대체 — 스킬 3개가 카탈로그와 함께 씀)
 ├─ agents/
 │  └─ wook-evaluator.md               # #5 독립 Evaluator 서브에이전트
 └─ skills/
@@ -484,8 +488,8 @@ my-claude-harness/                  # git repo (비밀 0, 단순 blacklist .giti
 ├─ CLAUDE.md                        # 이 repo 작업 시 컨벤션(build-log 갱신 등)
 ├─ docs/{claude-harness-design, build-log}.md
 ├─ claude/                          # ~/.claude 산출물의 source of truth
-│  ├─ hooks/{guard_paths, guard_bash, format_py, inject_plan_pointer, inject_reuse_pointer, inject_convention_pointer, remind_evaluator}.py
-│  ├─ harness/{gate_runner.py, install_gate.py, core-rules.md, core-rules.README.md, evaluate.recipe.example, conventions.frontend.example, project-map.example}
+│  ├─ hooks/{guard_paths, guard_bash, format_py, inject_plan_pointer, remind_evaluator}.py  # #31: 포인터 2개 삭제
+│  ├─ harness/{gate_runner.py, install_gate.py, core-rules.md, core-rules.README.md, evaluate.recipe.example, conventions.frontend.example, project-map.example, rules.catalog.example}
 │  ├─ agents/wook-evaluator.md       # #5 Evaluator 서브에이전트
 │  ├─ skills/{wook-evaluate, wook-plan, wook-brainstorm, wook-index, wook-conventions, wook-map, wook-onboard}/SKILL.md  # 진입점
 │  └─ settings.hooks.json           # 우리가 소유한 hooks 블록({HOOKS_DIR} placeholder)
