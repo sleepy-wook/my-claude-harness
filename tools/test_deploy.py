@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Tests for deploy.py's pure builders (Claude Code target).
 
-Moved out of the retired Codex-adapter test (Phase 1 of the Claude-only alignment):
+Moved out of the retired multi-agent adapter test (Phase 1 of the Claude-only alignment):
   - copy_tree really writes files (regression for the 2026-06-15 write_bytes() bug that
     only bit when a file actually changed — `--check` runs never exercised it)
   - build_user_claude_md renders core-rules into a marked block, idempotently, and never

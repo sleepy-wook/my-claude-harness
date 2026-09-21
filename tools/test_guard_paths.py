@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Tests for the guard_paths PreToolUse hook (Claude Code `file_path` field).
 
-Moved out of the retired Codex-adapter test. Runs the hook as a subprocess with a real
+Moved out of the retired multi-agent adapter test. Runs the hook as a subprocess with a real
 stdin event, exactly as Claude Code does.
 """
 
