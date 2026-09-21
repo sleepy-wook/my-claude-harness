@@ -3,7 +3,7 @@
 
 v2 of the commit gate: it moved from a PreToolUse hook that string-matched Bash
 commands into git's own pre-commit hook, so it fires identically for Claude Code,
-Codex, any other agent, AND a human committing from a terminal — and `--no-verify`
+any other agent, AND a human committing from a terminal — and `--no-verify`
 is git-native instead of reimplemented. Exit non-zero blocks the commit; the failure
 output flows back to whoever ran `git commit` (for an agent, via the Bash tool result).
 

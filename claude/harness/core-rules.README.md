@@ -1,13 +1,12 @@
 # core-rules.md 작성 가이드 (이 파일은 배포 도구가 읽지 않음)
 
 `core-rules.md`는 표준 작업 합의(standing rules)의 **소스**다. v2부터는 매 턴 주입이 아니라
-`deploy.py`가 두 운반체로 렌더한다:
+`deploy.py`가 한 운반체로 렌더한다:
 
 - **Claude Code** → `~/.claude/CLAUDE.md`의 marked block
   (`<!-- wook-harness:begin/end -->`). CLAUDE.md는 세션당 1회 로드·프롬프트 캐시되고,
   공식 문서상 compaction 후에도 재주입된다 — 매 턴 additionalContext로 중복 주입하던
   구(舊) `inject_core_rules.py` 방식(~700토큰/턴 누적)을 대체한 검증된 운반체다.
-- **Codex** → `~/.codex/AGENTS.md` (기존 그대로).
 
 ## 작성 규칙
 
@@ -16,7 +15,7 @@
 - **짧게 유지한다.** 항상 로드되는 컨텍스트이므로 길면 토큰 낭비 + 효과 희석.
   업계 가이드는 상시 지침 파일을 ~60줄 이하로 권장한다.
 - **행동 규칙을 둔다.** 세션이 길어지면 흐려지는 *행동* 규칙이 여기 적합하다.
-  프로젝트별 사실은 각 프로젝트의 CLAUDE.md/AGENTS.md에 두는 게 낫다.
+  프로젝트별 사실은 각 프로젝트의 CLAUDE.md에 두는 게 낫다.
 
 ## deploy가 처리하는 방식
 

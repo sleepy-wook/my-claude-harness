@@ -46,8 +46,7 @@ def protection_decision(file_path: str):
         return "deny", "private key material"
 
     # --- ASK: commit-gate control files (developer approves bar changes) ----
-    per_tool_dir = {".claude", ".codex"} & set(segments)
-    if per_tool_dir:
+    if ".claude" in segments:
         if name == "evaluate.recipe":
             return (
                 "ask",
@@ -77,7 +76,7 @@ def main() -> int:
         return 0  # can't parse -> stay out of the way
 
     tool_input = event.get("tool_input") or {}
-    file_path = tool_input.get("file_path") or tool_input.get("path")  # Claude / Codex
+    file_path = tool_input.get("file_path")
     if not file_path:
         return 0
 
