@@ -10,6 +10,7 @@ these cover the deterministic pieces. Run from the repo root. Exit 0 = all pass.
 
 import json
 import shutil
+import os
 import subprocess
 import sys
 import tempfile
@@ -38,7 +39,12 @@ def check(name, got, want):
 def run_hook(cwd, command):
     ev = {"cwd": cwd, "tool_input": {"command": command}}
     p = subprocess.run(
-        [sys.executable, REMIND], input=json.dumps(ev), capture_output=True, text=True, encoding="utf-8", errors="replace"
+        [sys.executable, REMIND],
+        input=json.dumps(ev),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
     )
     return p.stdout.strip()
 
@@ -46,7 +52,14 @@ def run_hook(cwd, command):
 def repo_with_commit(fname, n_lines, claude=True):
     """Throwaway git repo whose HEAD is a fresh commit touching fname (n_lines)."""
     d = tempfile.mkdtemp(prefix="eval_")
-    subprocess.run("git init -q", cwd=d, shell=True, check=True)
+    subprocess.run(
+        "git init -q",
+        cwd=d,
+        shell=True,
+        check=True,
+        # drop GIT_* so a hook environment cannot redirect this into the real repo (#30)
+        env={k: v for k, v in os.environ.items() if not k.startswith("GIT_")},
+    )
     if claude:
         (Path(d) / ".claude").mkdir()
     (Path(d) / fname).write_text(
